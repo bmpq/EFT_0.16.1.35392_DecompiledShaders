@@ -106,7 +106,7 @@ Shader "Decal/Ultra Deferred Decal Of God 3000 Dissolve" {
 			{
                 fout o;
                 float4 tmp0;
-                float4 tmp1;
+                float4 tmp1 = float4(0,0,0,0);
                 float4 tmp2;
                 tmp0 = tex2D(_MaskTex, inp.texcoord.xy);
                 tmp0.x = saturate(tmp0.x - 0.1);

@@ -1,39 +1,40 @@
 Shader "Koenigz/Unlit Occlusion Tag" {
 	Properties {
-		[PerRendererData] _Color ("Main Color", Color) = (1,1,1,1)
-		[Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 0
+		_Color ("Main Color", Color) = (1,1,1,1)
+		[Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 0  //Cull Off is 0. Consider default properties.
 	}
 	SubShader {
 		LOD 100
 		Tags { "RenderType" = "Opaque" }
 		Pass {
-			LOD 100
-			Tags { "RenderType" = "Opaque" }
-			Cull Off
+			Cull [_Cull]   // Use the property for culling
 			Fog {
-				Mode 0
+				Mode Off
 			}
-			GpuProgramID 27229
+			
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
 			
 			#include "UnityCG.cginc"
+
 			struct v2f
 			{
-				float4 position : SV_POSITION0;
+				float4 position : SV_POSITION;
 			};
+
 			struct fout
 			{
-				float4 sv_target : SV_Target0;
+				float4 sv_target : SV_Target;
 			};
+
 			// $Globals ConstantBuffers for Vertex Shader
 			// $Globals ConstantBuffers for Fragment Shader
 			// Custom ConstantBuffers for Vertex Shader
 			// Custom ConstantBuffers for Fragment Shader
-			CBUFFER_START(Props)
+			//CBUFFER_START(Props) //Not required since _Color is a global shader property.
 				float4 _Color;
-			CBUFFER_END
+			//CBUFFER_END
 			// Texture params for Vertex Shader
 			// Texture params for Fragment Shader
 			
@@ -41,16 +42,8 @@ Shader "Koenigz/Unlit Occlusion Tag" {
 			v2f vert(appdata_full v)
 			{
                 v2f o;
-                float4 tmp0;
-                float4 tmp1;
-                tmp0 = v.vertex.yyyy * unity_ObjectToWorld._m01_m11_m21_m31;
-                tmp0 = unity_ObjectToWorld._m00_m10_m20_m30 * v.vertex.xxxx + tmp0;
-                tmp0 = unity_ObjectToWorld._m02_m12_m22_m32 * v.vertex.zzzz + tmp0;
-                tmp0 = tmp0 + unity_ObjectToWorld._m03_m13_m23_m33;
-                tmp1 = tmp0.yyyy * cb1[18];
-                tmp1 = cb1[17] * tmp0.xxxx + tmp1;
-                tmp1 = cb1[19] * tmp0.zzzz + tmp1;
-                o.position = cb1[20] * tmp0.wwww + tmp1;
+				// Use UNITY_MATRIX_MVP for built-in render pipeline
+                o.position = UnityObjectToClipPos(v.vertex); 
                 return o;
 			}
 			// Keywords: 
@@ -62,7 +55,7 @@ Shader "Koenigz/Unlit Occlusion Tag" {
                 float4 tmp2;
                 tmp0.x = _Color.w >= 0.5;
                 tmp0.yz = inp.position.zz + inp.position.xy;
-                tmp0.zw = tmp0.yz * float2(0.618034, 0.618034);
+                tmp0.zw = tmp0.yz * float2(0.618034, 0.618034);  // Golden ratio.  Used for a simple dither.
                 tmp0.z = dot(tmp0.xy, tmp0.xy);
                 tmp0.z = sqrt(tmp0.z);
                 tmp0.z = tmp0.z * 12.0;
@@ -74,7 +67,7 @@ Shader "Koenigz/Unlit Occlusion Tag" {
                 tmp0.y = tmp0.y < 0.75;
                 tmp0.x = tmp0.y ? tmp0.x : 0.0;
                 if (tmp0.x) {
-                    discard;
+                    discard;  // Discard the fragment if the dither condition is met
                 }
                 o.sv_target.xyz = _Color.xyz;
                 o.sv_target.w = 1.0;
@@ -83,4 +76,5 @@ Shader "Koenigz/Unlit Occlusion Tag" {
 			ENDCG
 		}
 	}
+	FallBack "Diffuse" // Fallback is VERY IMPORTANT for shadows and depth
 }

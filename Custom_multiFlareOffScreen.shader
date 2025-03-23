@@ -15,7 +15,7 @@ Shader "Custom/multiFlareOffScreen" {
 			ZTest Always
 			ZWrite Off
 			Fog {
-				Mode 0
+				Mode Off
 			}
 			GpuProgramID 50128
 			// No subprograms found

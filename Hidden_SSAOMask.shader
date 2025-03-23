@@ -17,7 +17,7 @@ Shader "Hidden/SSAOMask" {
 				ZFail Keep
 			}
 			Fog {
-				Mode 0
+				Mode Off
 			}
 			GpuProgramID 4187
 			CGPROGRAM
