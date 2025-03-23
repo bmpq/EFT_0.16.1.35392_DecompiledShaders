@@ -1,4 +1,5 @@
-Shader "p0/Reflective/Bumped Emissive Specular SMap" { // using emmisive version. cant be that different???
+// this is the exact same file as 'p0/Reflective/Bumped Emissive Specular SMap'. cant be that different???
+Shader "p0/Reflective/Bumped Specular SMap" {
 	Properties {
 		_Color ("Main Color", Color) = (1,1,1,1)
 		_SpecMap ("GlossMap", 2D) = "white" {}
