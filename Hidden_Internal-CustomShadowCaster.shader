@@ -14,6 +14,26 @@ Shader "Hidden/Internal-CustomShadowCaster" {
 			#pragma fragment frag
 			
 			#include "UnityCG.cginc"
+
+            // --- Constant Buffer Declarations ---
+            cbuffer cb0 : register(b0)
+            {
+                // float4x4 _Object2World; // cb0[0] - Often the object's transformation matrix
+                // float4x4 _World2Object; // cb0[1]
+                // ... other variables in cb0 ...
+                float4 cb0[6]; // Placeholder.  We need the correct size!
+            };
+
+            cbuffer cb1 : register(b1)
+            {
+                float4 cb1[4];  // Model matrix (likely) - 4 rows of float4
+            };
+
+            cbuffer cb2 : register(b2)
+            {
+                float4 cb2[21]; // Projection matrix (likely) - at least 21 rows needed
+            };
+
 			struct v2f
 			{
 				float4 position : SV_POSITION0;
