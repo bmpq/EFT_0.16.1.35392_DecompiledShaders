@@ -1,39 +1,54 @@
-// this is the exact same file as 'p0/Reflective/Bumped Emissive Specular SMap'. cant be that different???
 Shader "p0/Reflective/Bumped Specular SMap" {
 	Properties {
+		[MaterialEnum(Static, 0, Characters, 1, Hands, 2)] _StencilType ("_StencilType", Float) = 0
 		_Color ("Main Color", Color) = (1,1,1,1)
+		_BaseTintColor ("Tint Color", Color) = (1,1,1,1)
 		_SpecMap ("GlossMap", 2D) = "white" {}
 		_SpecColor ("Specular Color", Color) = (0.5,0.5,0.5,1)
 		_Glossness ("Specularness", Range(0.01, 10)) = 1
-		_Specularness ("Glosness", Range(0.01, 10)) = 0.078125
+		_Specularness ("Glossness", Range(0.01, 10)) = 0.078125
 		_ReflectColor ("Reflection Color", Color) = (1,1,1,0.5)
 		_MainTex ("Base (RGB) Specular (A)", 2D) = "white" {}
+		[Toggle(TINTMASK)] _HasTint ("Has tint", Float) = 0
+		_TintMask ("Tint mask", 2D) = "black" {}
 		_Cube ("Reflection Cubemap", Cube) = "" {}
 		_BumpMap ("Normalmap", 2D) = "bump" {}
-		_EmissionMap ("EmissionMap", 2D) = "white" {}
-		_EmissiveColor ("EmissiveColor", Color) = (1,1,1,1)
-		_EmissionVisibility ("EmissionVisibility", Range(0, 1)) = 1
-		_EmissionPower ("EmissionPower", Range(0, 10)) = 1
 		_SpecVals ("Specular Vals", Vector) = (1.1,2,0,0)
 		_DefVals ("Defuse Vals", Vector) = (0.5,0.7,0,0)
 		_BumpTiling ("_BumpTiling", Float) = 1
+		_NormalIntensity ("Normal intensity", Float) = 1
+		_NormalUVMultiplier ("Normal UV tiling", Float) = 1
 		_Factor ("Z Offset Angle", Float) = 0
 		_Units ("Z Offset Forward", Float) = 0
 		_DropsSpec ("Drops spec", Float) = 128
+		_Temperature ("_Temperature", Vector) = (0.1,0.2,0.28,0)
 		[Space(30)] [Header(Wetting)] _RippleTexScale ("_RippleTexScale", Float) = 4
 		_RippleFakeLightIntensityOffset ("Ripple fake light offset", Float) = 0.7
 		_NightRippleFakeLightOffset ("Night fake light offset", Float) = 0.2
 		_NdotLOffset ("Normal dot light offset", Float) = 0.4
 		[Toggle(USERAIN)] _USERAIN ("Is material affected by rain", Float) = 0
 		[HideInInspector] _SkinnedMeshMaterial ("Skinned Mesh Material", Float) = 0
-		_Temperature ("_Temperature(min, max, factor)", Vector) = (0.1,1,2,0)
+		[Toggle(USEHEAT)] USEHEAT ("Use metal heat glow", Float) = 0
+		_HeatVisible ("_HeatVisible([0-1] for thermalVision only)", Float) = 1
+		[HDR] _HeatColor1 ("_HeatColor1", Color) = (1,0,0,1)
+		[HDR] _HeatColor2 ("_HeatColor2", Color) = (1,0.34,0,1)
+		_HeatCenter ("_HeatCenter", Vector) = (0,0,0,1)
+		_HeatSize ("_HeatSize", Vector) = (0.02,0.04,0.02,1)
+		_HeatTemp ("_HeatTemp", Float) = 0
 	}
 	SubShader {
 		Tags { "RenderType" = "Opaque" }
 		Pass {
 			Name "FORWARD"
 			Tags { "LIGHTMODE" = "FORWARDBASE" "RenderType" = "Opaque" "SHADOWSUPPORT" = "true" }
-			GpuProgramID 27584
+			Stencil {
+				WriteMask 3
+				Comp Always
+				Pass Replace
+				Fail Keep
+				ZFail Keep
+			}
+			GpuProgramID 54048
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -64,14 +79,14 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			float4 _ReflectColor;
 			float _Specularness;
 			float _Glossness;
-			float3 _EmissiveColor;
-			float _EmissionVisibility;
-			float _EmissionPower;
+			float _NormalIntensity;
+			float _NormalUVMultiplier;
 			float3 _SpecVals;
 			float3 _DefVals;
 			float _BumpTiling;
-			float4 _Temperature;
+			float3 _Temperature;
 			float _ThermalVisionOn;
+			float _HeatThermalFactor;
 			// Custom ConstantBuffers for Vertex Shader
 			// Custom ConstantBuffers for Fragment Shader
 			// Texture params for Vertex Shader
@@ -80,7 +95,6 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			sampler2D _SpecMap;
 			sampler2D _BumpMap;
 			samplerCUBE _Cube;
-			sampler2D _EmissionMap;
 			
 			// Keywords: DIRECTIONAL
 			v2f vert(appdata_full v)
@@ -164,35 +178,33 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp3.xyz = inp.texcoord1.xyz * tmp2.xxx + tmp3.xyz;
                 tmp3.xyz = inp.texcoord3.xyz * tmp2.zzz + tmp3.xyz;
                 tmp4 = tex2D(_MainTex, inp.texcoord.xy);
-                tmp4.xyz = tmp4.xyz * _Color.xyz;
-                tmp1.w = tmp4.w * _Glossness;
                 tmp5 = tex2D(_SpecMap, inp.texcoord.xy);
-                tmp2.w = tmp5.x * _Specularness;
+                tmp1.w = tmp5.x * _Specularness;
                 tmp5.xy = inp.texcoord.xy * _BumpTiling.xx;
                 tmp5 = tex2D(_BumpMap, tmp5.xy);
-                tmp5.x = tmp5.w * tmp5.x;
-                tmp5.xy = tmp5.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
-                tmp3.w = dot(tmp5.xy, tmp5.xy);
-                tmp3.w = min(tmp3.w, 1.0);
-                tmp3.w = 1.0 - tmp3.w;
-                tmp5.z = sqrt(tmp3.w);
-                tmp6.x = dot(inp.texcoord1.xyz, tmp5.xyz);
-                tmp6.y = dot(inp.texcoord2.xyz, tmp5.xyz);
-                tmp6.z = dot(inp.texcoord3.xyz, tmp5.xyz);
-                tmp3.w = dot(-tmp2.xyz, tmp6.xyz);
+                tmp5.yzw = tmp5.xyw * _NormalUVMultiplier.xxx;
+                tmp5.x = tmp5.w * tmp5.y;
+                tmp5.xy = tmp5.xz * float2(2.0, 2.0) + float2(-1.0, -1.0);
+                tmp2.w = dot(tmp5.xy, tmp5.xy);
+                tmp2.w = min(tmp2.w, 1.0);
+                tmp2.w = 1.0 - tmp2.w;
+                tmp6.z = sqrt(tmp2.w);
+                tmp4.xyz = tmp4.xyz * _Color.xyz;
+                tmp2.w = tmp4.w * _Glossness;
+                tmp6.xy = tmp5.xy * _NormalIntensity.xx;
+                tmp5.x = dot(inp.texcoord1.xyz, tmp6.xyz);
+                tmp5.y = dot(inp.texcoord2.xyz, tmp6.xyz);
+                tmp5.z = dot(inp.texcoord3.xyz, tmp6.xyz);
+                tmp3.w = dot(-tmp2.xyz, tmp5.xyz);
                 tmp3.w = tmp3.w + tmp3.w;
-                tmp2.xyz = tmp6.xyz * -tmp3.www + -tmp2.xyz;
+                tmp2.xyz = tmp5.xyz * -tmp3.www + -tmp2.xyz;
                 tmp7 = texCUBE(_Cube, tmp2.xyz);
                 tmp2.xyz = tmp4.www * tmp7.xyz;
                 tmp2.xyz = tmp2.xyz * _ReflectColor.xyz;
-                tmp7 = tex2D(_EmissionMap, inp.texcoord.xy);
-                tmp7.xyz = tmp7.xyz * _EmissiveColor;
-                tmp7.xyz = tmp7.xyz * _EmissionPower.xxx + -tmp2.xyz;
-                tmp2.xyz = _EmissionVisibility.xxx * tmp7.xyz + tmp2.xyz;
                 tmp3.w = dot(tmp3.xyz, tmp3.xyz);
                 tmp3.w = rsqrt(tmp3.w);
                 tmp3.xyz = tmp3.www * tmp3.xyz;
-                tmp3.x = dot(tmp3.xyz, tmp5.xyz);
+                tmp3.x = dot(tmp3.xyz, tmp6.xyz);
                 tmp3.x = 1.0 - tmp3.x;
                 tmp3.x = tmp3.x * tmp3.x;
                 tmp3.x = tmp3.x * 0.5;
@@ -200,34 +212,34 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp3.y = tmp3.y * 0.5;
                 tmp3.x = _DefVals.y * tmp3.x + _DefVals.x;
                 tmp3.xzw = tmp3.xxx * tmp4.xyz;
-                tmp1.w = tmp1.w * tmp3.y;
-                tmp4.x = _ThermalVisionOn > 0.0;
-                tmp4.yzw = tmp3.xzw * _Temperature.zzz;
-                tmp4.yzw = max(tmp4.yzw, _Temperature.xxx);
-                tmp4.yzw = min(tmp4.yzw, _Temperature.yyy);
-                tmp4.yzw = tmp4.yzw + _Temperature.www;
-                tmp3.xzw = tmp4.xxx ? tmp4.yzw : tmp3.xzw;
+                tmp2.w = tmp2.w * tmp3.y;
+                tmp4.x = tmp3.x * _Temperature.z;
+                tmp4.y = _ThermalVisionOn > 0.0;
+                tmp4.z = _Temperature.x * _HeatThermalFactor;
+                tmp4.x = max(tmp4.z, tmp4.x);
+                tmp4.x = min(tmp4.x, _Temperature.y);
+                tmp3.xzw = tmp4.yyy ? tmp4.xxx : tmp3.xzw;
                 tmp4.x = unity_ProbeVolumeParams.x == 1.0;
                 if (tmp4.x) {
                     tmp4.y = unity_ProbeVolumeParams.y == 1.0;
-                    tmp5.xyz = inp.texcoord2.www * unity_ProbeVolumeWorldToObject._m01_m11_m21;
-                    tmp5.xyz = unity_ProbeVolumeWorldToObject._m00_m10_m20 * inp.texcoord1.www + tmp5.xyz;
-                    tmp5.xyz = unity_ProbeVolumeWorldToObject._m02_m12_m22 * inp.texcoord3.www + tmp5.xyz;
-                    tmp5.xyz = tmp5.xyz + unity_ProbeVolumeWorldToObject._m03_m13_m23;
-                    tmp4.yzw = tmp4.yyy ? tmp5.xyz : tmp0.yzw;
+                    tmp6.xyz = inp.texcoord2.www * unity_ProbeVolumeWorldToObject._m01_m11_m21;
+                    tmp6.xyz = unity_ProbeVolumeWorldToObject._m00_m10_m20 * inp.texcoord1.www + tmp6.xyz;
+                    tmp6.xyz = unity_ProbeVolumeWorldToObject._m02_m12_m22 * inp.texcoord3.www + tmp6.xyz;
+                    tmp6.xyz = tmp6.xyz + unity_ProbeVolumeWorldToObject._m03_m13_m23;
+                    tmp4.yzw = tmp4.yyy ? tmp6.xyz : tmp0.yzw;
                     tmp4.yzw = tmp4.yzw - unity_ProbeVolumeMin;
-                    tmp5.yzw = tmp4.yzw * unity_ProbeVolumeSizeInv;
-                    tmp4.y = tmp5.y * 0.25 + 0.75;
+                    tmp6.yzw = tmp4.yzw * unity_ProbeVolumeSizeInv;
+                    tmp4.y = tmp6.y * 0.25 + 0.75;
                     tmp4.z = unity_ProbeVolumeParams.z * 0.5 + 0.75;
-                    tmp5.x = max(tmp4.z, tmp4.y);
-                    tmp5 = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, tmp5.xzw);
+                    tmp6.x = max(tmp4.z, tmp4.y);
+                    tmp6 = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, tmp6.xzw);
                 } else {
-                    tmp5 = float4(1.0, 1.0, 1.0, 1.0);
+                    tmp6 = float4(1.0, 1.0, 1.0, 1.0);
                 }
-                tmp4.y = saturate(dot(tmp5, unity_OcclusionMaskSelector));
-                tmp4.z = dot(tmp6.xyz, tmp6.xyz);
+                tmp4.y = saturate(dot(tmp6, unity_OcclusionMaskSelector));
+                tmp4.z = dot(tmp5.xyz, tmp5.xyz);
                 tmp4.z = rsqrt(tmp4.z);
-                tmp5.xyz = tmp4.zzz * tmp6.xyz;
+                tmp5.xyz = tmp4.zzz * tmp5.xyz;
                 tmp4.yzw = tmp4.yyy * _LightColor0.xyz;
                 if (tmp4.x) {
                     tmp4.x = unity_ProbeVolumeParams.y == 1.0;
@@ -273,11 +285,11 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp0.x = max(tmp0.x, 0.0);
                 tmp1.x = dot(tmp5.xyz, tmp1.xyz);
                 tmp1.x = max(tmp1.x, 0.0);
-                tmp1.y = tmp2.w * 128.0;
+                tmp1.y = tmp1.w * 128.0;
                 tmp1.x = log(tmp1.x);
                 tmp1.x = tmp1.x * tmp1.y;
                 tmp1.x = exp(tmp1.x);
-                tmp1.x = tmp1.w * tmp1.x;
+                tmp1.x = tmp2.w * tmp1.x;
                 tmp1.yzw = tmp3.xzw * tmp4.yzw;
                 tmp4.xyz = tmp4.yzw * _SpecColor.xyz;
                 tmp4.xyz = tmp1.xxx * tmp4.xyz;
@@ -294,7 +306,14 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			Tags { "LIGHTMODE" = "FORWARDADD" "RenderType" = "Opaque" }
 			Blend One One, One One
 			ZWrite Off
-			GpuProgramID 99223
+			Stencil {
+				WriteMask 3
+				Comp Always
+				Pass Replace
+				Fail Keep
+				ZFail Keep
+			}
+			GpuProgramID 113182
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -326,11 +345,14 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			float4 _Color;
 			float _Specularness;
 			float _Glossness;
+			float _NormalIntensity;
+			float _NormalUVMultiplier;
 			float3 _SpecVals;
 			float3 _DefVals;
 			float _BumpTiling;
-			float4 _Temperature;
+			float3 _Temperature;
 			float _ThermalVisionOn;
+			float _HeatThermalFactor;
 			// Custom ConstantBuffers for Vertex Shader
 			// Custom ConstantBuffers for Fragment Shader
 			// Texture params for Vertex Shader
@@ -416,22 +438,24 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp3.xyz = inp.texcoord1.xyz * tmp2.xxx + tmp3.xyz;
                 tmp3.xyz = inp.texcoord3.xyz * tmp2.zzz + tmp3.xyz;
                 tmp4 = tex2D(_MainTex, inp.texcoord.xy);
-                tmp4.xyz = tmp4.xyz * _Color.xyz;
-                tmp1.w = tmp4.w * _Glossness;
                 tmp5 = tex2D(_SpecMap, inp.texcoord.xy);
-                tmp2.w = tmp5.x * _Specularness;
+                tmp1.w = tmp5.x * _Specularness;
                 tmp5.xy = inp.texcoord.xy * _BumpTiling.xx;
                 tmp5 = tex2D(_BumpMap, tmp5.xy);
-                tmp5.x = tmp5.w * tmp5.x;
-                tmp5.xy = tmp5.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
-                tmp3.w = dot(tmp5.xy, tmp5.xy);
-                tmp3.w = min(tmp3.w, 1.0);
-                tmp3.w = 1.0 - tmp3.w;
-                tmp5.z = sqrt(tmp3.w);
+                tmp5.yzw = tmp5.xyw * _NormalUVMultiplier.xxx;
+                tmp5.x = tmp5.w * tmp5.y;
+                tmp5.xy = tmp5.xz * float2(2.0, 2.0) + float2(-1.0, -1.0);
+                tmp2.w = dot(tmp5.xy, tmp5.xy);
+                tmp2.w = min(tmp2.w, 1.0);
+                tmp2.w = 1.0 - tmp2.w;
+                tmp6.z = sqrt(tmp2.w);
+                tmp4.xyz = tmp4.xyz * _Color.xyz;
+                tmp2.w = tmp4.w * _Glossness;
+                tmp6.xy = tmp5.xy * _NormalIntensity.xx;
                 tmp3.w = dot(tmp3.xyz, tmp3.xyz);
                 tmp3.w = rsqrt(tmp3.w);
                 tmp3.xyz = tmp3.www * tmp3.xyz;
-                tmp3.x = dot(tmp3.xyz, tmp5.xyz);
+                tmp3.x = dot(tmp3.xyz, tmp6.xyz);
                 tmp3.x = 1.0 - tmp3.x;
                 tmp3.x = tmp3.x * tmp3.x;
                 tmp3.x = tmp3.x * 0.5;
@@ -439,13 +463,13 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp3.y = tmp3.y * 0.5;
                 tmp3.x = _DefVals.y * tmp3.x + _DefVals.x;
                 tmp3.xzw = tmp3.xxx * tmp4.xyz;
-                tmp1.w = tmp1.w * tmp3.y;
-                tmp3.y = _ThermalVisionOn > 0.0;
-                tmp4.xyz = tmp3.xzw * _Temperature.zzz;
-                tmp4.xyz = max(tmp4.xyz, _Temperature.xxx);
-                tmp4.xyz = min(tmp4.xyz, _Temperature.yyy);
-                tmp4.xyz = tmp4.xyz + _Temperature.www;
-                tmp3.xyz = tmp3.yyy ? tmp4.xyz : tmp3.xzw;
+                tmp2.w = tmp2.w * tmp3.y;
+                tmp3.y = tmp3.x * _Temperature.z;
+                tmp4.x = _ThermalVisionOn > 0.0;
+                tmp4.y = _Temperature.x * _HeatThermalFactor;
+                tmp3.y = max(tmp3.y, tmp4.y);
+                tmp3.y = min(tmp3.y, _Temperature.y);
+                tmp3.xyz = tmp4.xxx ? tmp3.yyy : tmp3.xzw;
                 tmp4.xyz = inp.texcoord4.yyy * unity_WorldToLight._m01_m11_m21;
                 tmp4.xyz = unity_WorldToLight._m00_m10_m20 * inp.texcoord4.xxx + tmp4.xyz;
                 tmp4.xyz = unity_WorldToLight._m02_m12_m22 * inp.texcoord4.zzz + tmp4.xyz;
@@ -453,27 +477,27 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp3.w = unity_ProbeVolumeParams.x == 1.0;
                 if (tmp3.w) {
                     tmp3.w = unity_ProbeVolumeParams.y == 1.0;
-                    tmp6.xyz = inp.texcoord4.yyy * unity_ProbeVolumeWorldToObject._m01_m11_m21;
-                    tmp6.xyz = unity_ProbeVolumeWorldToObject._m00_m10_m20 * inp.texcoord4.xxx + tmp6.xyz;
-                    tmp6.xyz = unity_ProbeVolumeWorldToObject._m02_m12_m22 * inp.texcoord4.zzz + tmp6.xyz;
-                    tmp6.xyz = tmp6.xyz + unity_ProbeVolumeWorldToObject._m03_m13_m23;
-                    tmp6.xyz = tmp3.www ? tmp6.xyz : inp.texcoord4.xyz;
-                    tmp6.xyz = tmp6.xyz - unity_ProbeVolumeMin;
-                    tmp6.yzw = tmp6.xyz * unity_ProbeVolumeSizeInv;
-                    tmp3.w = tmp6.y * 0.25 + 0.75;
+                    tmp5.xyz = inp.texcoord4.yyy * unity_ProbeVolumeWorldToObject._m01_m11_m21;
+                    tmp5.xyz = unity_ProbeVolumeWorldToObject._m00_m10_m20 * inp.texcoord4.xxx + tmp5.xyz;
+                    tmp5.xyz = unity_ProbeVolumeWorldToObject._m02_m12_m22 * inp.texcoord4.zzz + tmp5.xyz;
+                    tmp5.xyz = tmp5.xyz + unity_ProbeVolumeWorldToObject._m03_m13_m23;
+                    tmp5.xyz = tmp3.www ? tmp5.xyz : inp.texcoord4.xyz;
+                    tmp5.xyz = tmp5.xyz - unity_ProbeVolumeMin;
+                    tmp5.yzw = tmp5.xyz * unity_ProbeVolumeSizeInv;
+                    tmp3.w = tmp5.y * 0.25 + 0.75;
                     tmp4.w = unity_ProbeVolumeParams.z * 0.5 + 0.75;
-                    tmp6.x = max(tmp3.w, tmp4.w);
-                    tmp6 = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, tmp6.xzw);
+                    tmp5.x = max(tmp3.w, tmp4.w);
+                    tmp5 = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, tmp5.xzw);
                 } else {
-                    tmp6 = float4(1.0, 1.0, 1.0, 1.0);
+                    tmp5 = float4(1.0, 1.0, 1.0, 1.0);
                 }
-                tmp3.w = saturate(dot(tmp6, unity_OcclusionMaskSelector));
+                tmp3.w = saturate(dot(tmp5, unity_OcclusionMaskSelector));
                 tmp4.x = dot(tmp4.xyz, tmp4.xyz);
                 tmp4 = tex2D(_LightTexture0, tmp4.xx);
                 tmp3.w = tmp3.w * tmp4.x;
-                tmp4.x = dot(inp.texcoord1.xyz, tmp5.xyz);
-                tmp4.y = dot(inp.texcoord2.xyz, tmp5.xyz);
-                tmp4.z = dot(inp.texcoord3.xyz, tmp5.xyz);
+                tmp4.x = dot(inp.texcoord1.xyz, tmp6.xyz);
+                tmp4.y = dot(inp.texcoord2.xyz, tmp6.xyz);
+                tmp4.z = dot(inp.texcoord3.xyz, tmp6.xyz);
                 tmp4.w = dot(tmp4.xyz, tmp4.xyz);
                 tmp4.w = rsqrt(tmp4.w);
                 tmp4.xyz = tmp4.www * tmp4.xyz;
@@ -485,11 +509,11 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp0.w = dot(tmp4.xyz, tmp1.xyz);
                 tmp0.x = dot(tmp4.xyz, tmp0.xyz);
                 tmp0.xw = max(tmp0.xw, float2(0.0, 0.0));
-                tmp0.y = tmp2.w * 128.0;
+                tmp0.y = tmp1.w * 128.0;
                 tmp0.x = log(tmp0.x);
                 tmp0.x = tmp0.x * tmp0.y;
                 tmp0.x = exp(tmp0.x);
-                tmp0.x = tmp1.w * tmp0.x;
+                tmp0.x = tmp2.w * tmp0.x;
                 tmp1.xyz = tmp3.xyz * tmp5.xyz;
                 tmp2.xyz = tmp5.xyz * _SpecColor.xyz;
                 tmp0.xyz = tmp0.xxx * tmp2.xyz;
@@ -502,7 +526,14 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 		Pass {
 			Name "PREPASS"
 			Tags { "LIGHTMODE" = "PREPASSBASE" "RenderType" = "Opaque" }
-			GpuProgramID 169424
+			Stencil {
+				WriteMask 3
+				Comp Always
+				Pass Replace
+				Fail Keep
+				ZFail Keep
+			}
+			GpuProgramID 138554
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -526,6 +557,8 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			float4 _MainTex_ST;
 			// $Globals ConstantBuffers for Fragment Shader
 			float _Specularness;
+			float _NormalIntensity;
+			float _NormalUVMultiplier;
 			float _BumpTiling;
 			// Custom ConstantBuffers for Vertex Shader
 			// Custom ConstantBuffers for Fragment Shader
@@ -592,18 +625,20 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 float4 tmp1;
                 tmp0.xy = inp.texcoord.xy * _BumpTiling.xx;
                 tmp0 = tex2D(_BumpMap, tmp0.xy);
-                tmp0.x = tmp0.w * tmp0.x;
-                tmp0.xy = tmp0.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
-                tmp0.w = dot(tmp0.xy, tmp0.xy);
-                tmp0.w = min(tmp0.w, 1.0);
-                tmp0.w = 1.0 - tmp0.w;
-                tmp0.z = sqrt(tmp0.w);
-                tmp1.x = dot(inp.texcoord1.xyz, tmp0.xyz);
-                tmp1.y = dot(inp.texcoord2.xyz, tmp0.xyz);
-                tmp1.z = dot(inp.texcoord3.xyz, tmp0.xyz);
-                tmp0.x = dot(tmp1.xyz, tmp1.xyz);
-                tmp0.x = rsqrt(tmp0.x);
-                tmp0.xyz = tmp0.xxx * tmp1.xyz;
+                tmp0.yzw = tmp0.xyw * _NormalUVMultiplier.xxx;
+                tmp0.x = tmp0.w * tmp0.y;
+                tmp0.xy = tmp0.xz * float2(2.0, 2.0) + float2(-1.0, -1.0);
+                tmp0.z = dot(tmp0.xy, tmp0.xy);
+                tmp1.xy = tmp0.xy * _NormalIntensity.xx;
+                tmp0.x = min(tmp0.z, 1.0);
+                tmp0.x = 1.0 - tmp0.x;
+                tmp1.z = sqrt(tmp0.x);
+                tmp0.x = dot(inp.texcoord1.xyz, tmp1.xyz);
+                tmp0.y = dot(inp.texcoord2.xyz, tmp1.xyz);
+                tmp0.z = dot(inp.texcoord3.xyz, tmp1.xyz);
+                tmp0.w = dot(tmp0.xyz, tmp0.xyz);
+                tmp0.w = rsqrt(tmp0.w);
+                tmp0.xyz = tmp0.www * tmp0.xyz;
                 o.sv_target.xyz = tmp0.xyz * float3(0.5, 0.5, 0.5) + float3(0.5, 0.5, 0.5);
                 tmp0 = tex2D(_SpecMap, inp.texcoord.xy);
                 o.sv_target.w = tmp0.x * _Specularness;
@@ -615,7 +650,14 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			Name "PREPASS"
 			Tags { "LIGHTMODE" = "PREPASSFINAL" "RenderType" = "Opaque" }
 			ZWrite Off
-			GpuProgramID 223310
+			Stencil {
+				WriteMask 3
+				Comp Always
+				Pass Replace
+				Fail Keep
+				ZFail Keep
+			}
+			GpuProgramID 238452
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -645,14 +687,14 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			float4 _Color;
 			float4 _ReflectColor;
 			float _Glossness;
-			float3 _EmissiveColor;
-			float _EmissionVisibility;
-			float _EmissionPower;
+			float _NormalIntensity;
+			float _NormalUVMultiplier;
 			float3 _SpecVals;
 			float3 _DefVals;
 			float _BumpTiling;
-			float4 _Temperature;
+			float3 _Temperature;
 			float _ThermalVisionOn;
+			float _HeatThermalFactor;
 			// Custom ConstantBuffers for Vertex Shader
 			// Custom ConstantBuffers for Fragment Shader
 			// Texture params for Vertex Shader
@@ -660,7 +702,6 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			sampler2D _MainTex;
 			sampler2D _BumpMap;
 			samplerCUBE _Cube;
-			sampler2D _EmissionMap;
 			sampler2D _LightBuffer;
 			
 			// Keywords: 
@@ -763,9 +804,11 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp1.xyz = tmp0.www * tmp1.xyz;
                 tmp2.xy = inp.texcoord.xy * _BumpTiling.xx;
                 tmp2 = tex2D(_BumpMap, tmp2.xy);
-                tmp2.x = tmp2.w * tmp2.x;
-                tmp2.xy = tmp2.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
+                tmp2.yzw = tmp2.xyw * _NormalUVMultiplier.xxx;
+                tmp2.x = tmp2.w * tmp2.y;
+                tmp2.xy = tmp2.xz * float2(2.0, 2.0) + float2(-1.0, -1.0);
                 tmp0.w = dot(tmp2.xy, tmp2.xy);
+                tmp2.xy = tmp2.xy * _NormalIntensity.xx;
                 tmp0.w = min(tmp0.w, 1.0);
                 tmp0.w = 1.0 - tmp0.w;
                 tmp2.z = sqrt(tmp0.w);
@@ -779,12 +822,12 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp3 = tex2D(_MainTex, inp.texcoord.xy);
                 tmp1.yzw = tmp3.xyz * _Color.xyz;
                 tmp1.xyz = tmp1.xxx * tmp1.yzw;
-                tmp3.xyz = tmp1.xyz * _Temperature.zzz;
-                tmp3.xyz = max(tmp3.xyz, _Temperature.xxx);
-                tmp3.xyz = min(tmp3.xyz, _Temperature.yyy);
-                tmp3.xyz = tmp3.xyz + _Temperature.www;
-                tmp1.w = _ThermalVisionOn > 0.0;
-                tmp1.xyz = tmp1.www ? tmp3.xyz : tmp1.xyz;
+                tmp1.w = tmp1.x * _Temperature.z;
+                tmp2.w = _Temperature.x * _HeatThermalFactor;
+                tmp1.w = max(tmp1.w, tmp2.w);
+                tmp1.w = min(tmp1.w, _Temperature.y);
+                tmp2.w = _ThermalVisionOn > 0.0;
+                tmp1.xyz = tmp2.www ? tmp1.www : tmp1.xyz;
                 tmp1.w = tmp3.w * _Glossness;
                 tmp1.w = tmp0.w * tmp1.w;
                 tmp3.xy = inp.texcoord6.xy / inp.texcoord6.ww;
@@ -804,10 +847,6 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp2 = texCUBE(_Cube, tmp0.xyz);
                 tmp0.xyz = tmp3.www * tmp2.xyz;
                 tmp0.xyz = tmp0.xyz * _ReflectColor.xyz;
-                tmp2 = tex2D(_EmissionMap, inp.texcoord.xy);
-                tmp2.xyz = tmp2.xyz * _EmissiveColor;
-                tmp2.xyz = tmp2.xyz * _EmissionPower.xxx + -tmp0.xyz;
-                tmp0.xyz = _EmissionVisibility.xxx * tmp2.xyz + tmp0.xyz;
                 o.sv_target.xyz = tmp0.xyz * tmp0.www + tmp1.xyz;
                 o.sv_target.w = 0.0;
                 return o;
@@ -817,7 +856,14 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 		Pass {
 			Name "DEFERRED"
 			Tags { "LIGHTMODE" = "DEFERRED" "RenderType" = "Opaque" }
-			GpuProgramID 263151
+			Stencil {
+				WriteMask 3
+				Comp Always
+				Pass Replace
+				Fail Keep
+				ZFail Keep
+			}
+			GpuProgramID 281220
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -851,14 +897,14 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			float4 _ReflectColor;
 			float _Specularness;
 			float _Glossness;
-			float3 _EmissiveColor;
-			float _EmissionVisibility;
-			float _EmissionPower;
+			float _NormalIntensity;
+			float _NormalUVMultiplier;
 			float3 _SpecVals;
 			float3 _DefVals;
 			float _BumpTiling;
-			float4 _Temperature;
+			float3 _Temperature;
 			float _ThermalVisionOn;
+			float _HeatThermalFactor;
 			// Custom ConstantBuffers for Vertex Shader
 			// Custom ConstantBuffers for Fragment Shader
 			// Texture params for Vertex Shader
@@ -867,7 +913,6 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			sampler2D _SpecMap;
 			sampler2D _BumpMap;
 			samplerCUBE _Cube;
-			sampler2D _EmissionMap;
 			
 			// Keywords: 
 			v2f vert(appdata_full v)
@@ -953,32 +998,30 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp0.x = rsqrt(tmp0.x);
                 tmp2.xyz = tmp0.xxx * inp.texcoord6.xyz;
                 tmp3 = tex2D(_MainTex, inp.texcoord.xy);
-                tmp3.xyz = tmp3.xyz * _Color.xyz;
-                tmp0.x = tmp3.w * _Glossness;
                 tmp4 = tex2D(_SpecMap, inp.texcoord.xy);
                 o.sv_target1.w = tmp4.x * _Specularness;
                 tmp4.xy = inp.texcoord.xy * _BumpTiling.xx;
                 tmp4 = tex2D(_BumpMap, tmp4.xy);
-                tmp4.x = tmp4.w * tmp4.x;
-                tmp4.xy = tmp4.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
-                tmp1.w = dot(tmp4.xy, tmp4.xy);
-                tmp1.w = min(tmp1.w, 1.0);
-                tmp1.w = 1.0 - tmp1.w;
-                tmp4.z = sqrt(tmp1.w);
-                tmp5.x = dot(inp.texcoord1.xyz, tmp4.xyz);
-                tmp5.y = dot(inp.texcoord2.xyz, tmp4.xyz);
-                tmp5.z = dot(inp.texcoord3.xyz, tmp4.xyz);
-                tmp1.w = dot(-tmp1.xyz, tmp5.xyz);
+                tmp4.yzw = tmp4.xyw * _NormalUVMultiplier.xxx;
+                tmp4.x = tmp4.w * tmp4.y;
+                tmp4.xy = tmp4.xz * float2(2.0, 2.0) + float2(-1.0, -1.0);
+                tmp0.x = dot(tmp4.xy, tmp4.xy);
+                tmp0.x = min(tmp0.x, 1.0);
+                tmp0.x = 1.0 - tmp0.x;
+                tmp5.z = sqrt(tmp0.x);
+                tmp3.xyz = tmp3.xyz * _Color.xyz;
+                tmp0.x = tmp3.w * _Glossness;
+                tmp5.xy = tmp4.xy * _NormalIntensity.xx;
+                tmp4.x = dot(inp.texcoord1.xyz, tmp5.xyz);
+                tmp4.y = dot(inp.texcoord2.xyz, tmp5.xyz);
+                tmp4.z = dot(inp.texcoord3.xyz, tmp5.xyz);
+                tmp1.w = dot(-tmp1.xyz, tmp4.xyz);
                 tmp1.w = tmp1.w + tmp1.w;
-                tmp1.xyz = tmp5.xyz * -tmp1.www + -tmp1.xyz;
+                tmp1.xyz = tmp4.xyz * -tmp1.www + -tmp1.xyz;
                 tmp1 = texCUBE(_Cube, tmp1.xyz);
                 tmp1.xyz = tmp3.www * tmp1.xyz;
                 tmp1.xyz = tmp1.xyz * _ReflectColor.xyz;
-                tmp6 = tex2D(_EmissionMap, inp.texcoord.xy);
-                tmp6.xyz = tmp6.xyz * _EmissiveColor;
-                tmp6.xyz = tmp6.xyz * _EmissionPower.xxx + -tmp1.xyz;
-                tmp1.xyz = _EmissionVisibility.xxx * tmp6.xyz + tmp1.xyz;
-                tmp1.w = dot(tmp2.xyz, tmp4.xyz);
+                tmp1.w = dot(tmp2.xyz, tmp5.xyz);
                 tmp1.w = 1.0 - tmp1.w;
                 tmp1.w = tmp1.w * tmp1.w;
                 tmp1.w = tmp1.w * 0.5;
@@ -987,15 +1030,15 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 tmp1.w = _DefVals.y * tmp1.w + _DefVals.x;
                 tmp2.yzw = tmp1.www * tmp3.xyz;
                 tmp0.x = tmp0.x * tmp2.x;
-                tmp1.w = _ThermalVisionOn > 0.0;
-                tmp3.xyz = tmp2.yzw * _Temperature.zzz;
-                tmp3.xyz = max(tmp3.xyz, _Temperature.xxx);
-                tmp3.xyz = min(tmp3.xyz, _Temperature.yyy);
-                tmp3.xyz = tmp3.xyz + _Temperature.www;
-                tmp2.yzw = tmp1.www ? tmp3.xyz : tmp2.yzw;
-                tmp1.w = dot(tmp5.xyz, tmp5.xyz);
+                tmp1.w = tmp2.y * _Temperature.z;
+                tmp3.x = _ThermalVisionOn > 0.0;
+                tmp3.y = _Temperature.x * _HeatThermalFactor;
+                tmp1.w = max(tmp1.w, tmp3.y);
+                tmp1.w = min(tmp1.w, _Temperature.y);
+                tmp2.yzw = tmp3.xxx ? tmp1.www : tmp2.yzw;
+                tmp1.w = dot(tmp4.xyz, tmp4.xyz);
                 tmp1.w = rsqrt(tmp1.w);
-                tmp3.xyz = tmp1.www * tmp5.xyz;
+                tmp3.xyz = tmp1.www * tmp4.xyz;
                 tmp1.w = unity_ProbeVolumeParams.x == 1.0;
                 if (tmp1.w) {
                     tmp1.w = unity_ProbeVolumeParams.y == 1.0;
@@ -1037,9 +1080,7 @@ Shader "p0/Reflective/Bumped Specular SMap" {
                 o.sv_target2.xyz = tmp3.xyz * float3(0.5, 0.5, 0.5) + float3(0.5, 0.5, 0.5);
                 tmp0.xyz = tmp0.yzw * tmp2.yzw;
                 tmp0.xyz = tmp1.xyz * tmp2.xxx + tmp0.xyz;
-
-                //o.sv_target3.xyz = exp(-tmp0.xyz); (HDR fix!) just remove this
-
+                //o.sv_target3.xyz = exp(-tmp0.xyz);
                 o.sv_target.xyz = tmp2.yzw;
                 o.sv_target.w = 1.0;
                 o.sv_target2.w = 1.0;
@@ -1048,8 +1089,74 @@ Shader "p0/Reflective/Bumped Specular SMap" {
 			}
 			ENDCG
 		}
-		UsePass "Hidden/Internal-ShadowCaster/ShadowCaster"
+		Pass {
+			Name "ShadowCaster"
+			Tags { "LIGHTMODE" = "SHADOWCASTER" "RenderType" = "Opaque" "SHADOWSUPPORT" = "true" }
+			ColorMask 0 -1
+			ZClip Off
+			Cull Front
+			Stencil {
+				WriteMask 3
+				Comp Always
+				Pass Replace
+				Fail Keep
+				ZFail Keep
+			}
+			GpuProgramID 378005
+			CGPROGRAM
+			#pragma vertex vert
+			#pragma fragment frag
+			
+			#include "UnityCG.cginc"
+			struct v2f
+			{
+				float4 position : SV_POSITION0;
+			};
+			struct fout
+			{
+				float4 sv_target : SV_Target0;
+			};
+			// $Globals ConstantBuffers for Vertex Shader
+			// $Globals ConstantBuffers for Fragment Shader
+			// Custom ConstantBuffers for Vertex Shader
+			// Custom ConstantBuffers for Fragment Shader
+			// Texture params for Vertex Shader
+			// Texture params for Fragment Shader
+			
+			// Keywords: SHADOWS_DEPTH
+			v2f vert(appdata_full v)
+			{
+                v2f o;
+                float4 tmp0;
+                float4 tmp1;
+                tmp0 = v.vertex.yyyy * unity_ObjectToWorld._m01_m11_m21_m31;
+                tmp0 = unity_ObjectToWorld._m00_m10_m20_m30 * v.vertex.xxxx + tmp0;
+                tmp0 = unity_ObjectToWorld._m02_m12_m22_m32 * v.vertex.zzzz + tmp0;
+                tmp0 = tmp0 + unity_ObjectToWorld._m03_m13_m23_m33;
+                tmp1 = tmp0.yyyy * unity_MatrixVP._m01_m11_m21_m31;
+                tmp1 = unity_MatrixVP._m00_m10_m20_m30 * tmp0.xxxx + tmp1;
+                tmp1 = unity_MatrixVP._m02_m12_m22_m32 * tmp0.zzzz + tmp1;
+                tmp0 = unity_MatrixVP._m03_m13_m23_m33 * tmp0.wwww + tmp1;
+                tmp1.x = unity_LightShadowBias.x / tmp0.w;
+                tmp1.x = min(tmp1.x, 0.0);
+                tmp1.x = max(tmp1.x, -1.0);
+                tmp0.z = tmp0.z + tmp1.x;
+                tmp1.x = min(tmp0.w, tmp0.z);
+                o.position.xyw = tmp0.xyw;
+                tmp0.x = tmp1.x - tmp0.z;
+                o.position.z = unity_LightShadowBias.y * tmp0.x + tmp0.z;
+                return o;
+			}
+			// Keywords: SHADOWS_DEPTH
+			fout frag(v2f inp)
+			{
+                fout o;
+                o.sv_target = float4(0.0, 0.0, 0.0, 0.0);
+                return o;
+			}
+			ENDCG
+		}
 	}
-	Fallback "Hidden/Internal-BlackError"
+	Fallback "Reflective/Bumped Diffuse"
 	CustomEditor "FresnelMaterialEditor"
 }
