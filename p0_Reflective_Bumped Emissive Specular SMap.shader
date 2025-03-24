@@ -818,6 +818,7 @@ Shader "p0/Reflective/Bumped Emissive Specular SMap" {
 			Tags { "LIGHTMODE" = "DEFERRED" "RenderType" = "Opaque" }
 			GpuProgramID 263151
 			CGPROGRAM
+            #pragma multi_compile ___ UNITY_HDR_ON
 			#pragma vertex vert
 			#pragma fragment frag
 			
@@ -1086,8 +1087,14 @@ Shader "p0/Reflective/Bumped Emissive Specular SMap" {
                 tmp0.xyz = tmp0.yzw * tmp2.yzw;                // Ambient * Diffuse
                 tmp0.xyz = tmp1.xyz * tmp2.xxx + tmp0.xyz;   // Emission * Specular + Ambient*Diffuse
 
-                o.sv_target3.xyz = tmp0.xyz; // THIS IS THE FIX, NOW IS USED FOR EMISSION CALCULATION
-                o.sv_target3.w = 1.0;
+
+                
+                #ifdef UNITY_HDR_ON
+                    o.sv_target3.xyz = tmp0.xyz;
+                    o.sv_target3.w = 1.0;
+                #else
+                    o.sv_target3.xyz = exp(-tmp0.xyz);
+                #endif
 
                 return o;
             }

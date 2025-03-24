@@ -640,6 +640,7 @@ Shader "p0/Bumped Specular" {
 			Tags { "LIGHTMODE" = "DEFERRED" "RenderType" = "Opaque" }
 			GpuProgramID 326996
 			CGPROGRAM
+            #pragma multi_compile ___ UNITY_HDR_ON
 			#pragma vertex vert
 			#pragma fragment frag
 			
@@ -768,7 +769,13 @@ Shader "p0/Bumped Specular" {
                 tmp0.xyz = tmp0.www * tmp0.xyz;
                 o.sv_target2.xyz = tmp0.xyz * float3(0.5, 0.5, 0.5) + float3(0.5, 0.5, 0.5);
                 o.sv_target2.w = 1.0;
-                o.sv_target3 = float4(1.0, 1.0, 1.0, 1.0);
+
+                #ifdef UNITY_HDR_ON
+                    o.sv_target3 = float4(0, 0, 0, 1.0);
+                #else
+                    o.sv_target3 = float4(1.0, 1.0, 1.0, 1.0);
+                #endif
+
                 return o;
 			}
 			ENDCG

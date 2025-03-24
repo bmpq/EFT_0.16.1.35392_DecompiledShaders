@@ -827,6 +827,7 @@ Shader "p0/Reflective/Bumped Specular SMap_Decal" {
 			}
 			GpuProgramID 305819
 			CGPROGRAM
+            #pragma multi_compile ___ UNITY_HDR_ON
 			#pragma vertex vert
 			#pragma fragment frag
 			
@@ -1004,7 +1005,13 @@ Shader "p0/Reflective/Bumped Specular SMap_Decal" {
                 tmp0.xyz = tmp2.www * tmp0.xyz;
                 tmp0.xyz = tmp0.xyz * _ReflectColor.xyz;
                 tmp0.xyz = tmp1.xxx * tmp0.xyz;
-                //o.sv_target3.xyz = exp(-tmp0.xyz);
+
+                #ifdef UNITY_HDR_ON
+                    o.sv_target3 = float4(0, 0, 0, 1.0);
+                #else
+                    o.sv_target3.xyz = exp(-tmp0.xyz);
+                #endif
+
                 o.sv_target3.w = 1.0;
                 return o;
 			}

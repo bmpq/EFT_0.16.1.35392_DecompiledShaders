@@ -37,6 +37,7 @@ Shader "Custom/Vert Paint Shader Solid" {
 			Tags { "LIGHTMODE" = "DEFERRED" "QUEUE" = "Geometry+5" "RenderType" = "Opaque" }
 			GpuProgramID 41241
 			CGPROGRAM
+            #pragma multi_compile ___ UNITY_HDR_ON
 			#pragma vertex vert
 			#pragma fragment frag
 			
@@ -281,7 +282,13 @@ Shader "Custom/Vert Paint Shader Solid" {
                 }
                 tmp0.xyz = tmp0.xxx * tmp5.yzw;
                 tmp0.xyz = tmp5.xxx * tmp0.xyz;
-                // o.sv_target3.xyz = exp(-tmp0.xyz); (removing this fixed HDR)
+
+                #ifdef UNITY_HDR_ON
+                    o.sv_target3 = float4(0, 0, 0, 1.0);
+                #else
+                    o.sv_target3.xyz = exp(-tmp0.xyz);
+                #endif
+
                 tmp0.x = _ThermalVisionOn > 0.0;
                 tmp6.w = 1.0;
                 tmp2 = tmp6 * _Temperature2;
