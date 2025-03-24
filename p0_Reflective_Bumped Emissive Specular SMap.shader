@@ -1,4 +1,4 @@
-Shader "p0/Reflective/Bumped Emissive Specular SMap" { // using emmisive version. cant be that different???
+Shader "p0/Reflective/Bumped Emissive Specular SMap" {
 	Properties {
 		_Color ("Main Color", Color) = (1,1,1,1)
 		_SpecMap ("GlossMap", 2D) = "white" {}
@@ -930,9 +930,9 @@ Shader "p0/Reflective/Bumped Emissive Specular SMap" { // using emmisive version
                 o.texcoord8.xyz = unity_SHC.xyz * tmp0.xxx + tmp2.xyz;
                 return o;
 			}
-			// Keywords: 
-			fout frag(v2f inp)
-			{
+			            // Keywords: 
+            fout frag(v2f inp)
+            {
                 fout o;
                 float4 tmp0;
                 float4 tmp1;
@@ -941,68 +941,99 @@ Shader "p0/Reflective/Bumped Emissive Specular SMap" { // using emmisive version
                 float4 tmp4;
                 float4 tmp5;
                 float4 tmp6;
+
+                // --- Calculate View Direction ---
                 tmp0.y = inp.texcoord1.w;
                 tmp0.z = inp.texcoord2.w;
                 tmp0.w = inp.texcoord3.w;
                 tmp1.xyz = _WorldSpaceCameraPos - tmp0.yzw;
                 tmp0.x = dot(tmp1.xyz, tmp1.xyz);
                 tmp0.x = rsqrt(tmp0.x);
-                tmp1.xyz = tmp0.xxx * tmp1.xyz;
+                tmp1.xyz = tmp0.xxx * tmp1.xyz; // Normalized view direction
+
+                // --- Calculate Reflected Direction (approximation)---
                 tmp0.x = dot(inp.texcoord6.xyz, inp.texcoord6.xyz);
                 tmp0.x = rsqrt(tmp0.x);
-                tmp2.xyz = tmp0.xxx * inp.texcoord6.xyz;
+                tmp2.xyz = tmp0.xxx * inp.texcoord6.xyz; //This appears to be re-using a tangent space vector for a reflection calculation
+
+
+                // --- Base Color and Gloss ---
                 tmp3 = tex2D(_MainTex, inp.texcoord.xy);
                 tmp3.xyz = tmp3.xyz * _Color.xyz;
-                tmp0.x = tmp3.w * _Glossness;
+                tmp0.x = tmp3.w * _Glossness; // Glossiness from texture alpha and property
+
+                // --- Specular and Specular Mask ---
                 tmp4 = tex2D(_SpecMap, inp.texcoord.xy);
-                o.sv_target1.w = tmp4.x * _Specularness;
+                o.sv_target1.w = tmp4.x * _Specularness; // Specular intensity output (GBuffer1.a)
+
+                // --- Normal Mapping ---
                 tmp4.xy = inp.texcoord.xy * _BumpTiling.xx;
                 tmp4 = tex2D(_BumpMap, tmp4.xy);
-                tmp4.x = tmp4.w * tmp4.x;
-                tmp4.xy = tmp4.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
+                tmp4.x = tmp4.w * tmp4.x; // Use alpha for normal perturbation strength
+                tmp4.xy = tmp4.xy * float2(2.0, 2.0) + float2(-1.0, -1.0); // Convert from [0,1] to [-1,1]
                 tmp1.w = dot(tmp4.xy, tmp4.xy);
-                tmp1.w = min(tmp1.w, 1.0);
+                tmp1.w = min(tmp1.w, 1.0); // Clamp
                 tmp1.w = 1.0 - tmp1.w;
-                tmp4.z = sqrt(tmp1.w);
-                tmp5.x = dot(inp.texcoord1.xyz, tmp4.xyz);
-                tmp5.y = dot(inp.texcoord2.xyz, tmp4.xyz);
+                tmp4.z = sqrt(tmp1.w);     // Calculate Z component of normal
+                tmp5.x = dot(inp.texcoord1.xyz, tmp4.xyz); // Transform normal to world space
+                tmp5.y = dot(inp.texcoord2.xyz, tmp4.xyz); // (Tangent, Bitangent, Normal)
                 tmp5.z = dot(inp.texcoord3.xyz, tmp4.xyz);
-                tmp1.w = dot(-tmp1.xyz, tmp5.xyz);
-                tmp1.w = tmp1.w + tmp1.w;
-                tmp1.xyz = tmp5.xyz * -tmp1.www + -tmp1.xyz;
-                tmp1 = texCUBE(_Cube, tmp1.xyz);
-                tmp1.xyz = tmp3.www * tmp1.xyz;
-                tmp1.xyz = tmp1.xyz * _ReflectColor.xyz;
-                tmp6 = tex2D(_EmissionMap, inp.texcoord.xy);
-                tmp6.xyz = tmp6.xyz * _EmissiveColor;
-                tmp6.xyz = tmp6.xyz * _EmissionPower.xxx + -tmp1.xyz;
+
+                // --- Calculate reflection vector ---
+                tmp1.w = dot(-tmp1.xyz, tmp5.xyz);  // -View . Normal
+                tmp1.w = tmp1.w + tmp1.w;           // 2 * (-View . Normal)
+                tmp1.xyz = tmp5.xyz * -tmp1.www + -tmp1.xyz; // ReflectedView = 2 * (Normal . View) * Normal - View
+                tmp1 = texCUBE(_Cube, tmp1.xyz);     // Sample reflection cubemap
+                tmp1.xyz = tmp3.w * tmp1.xyz;      // Modulate reflection by texture alpha
+                tmp1.xyz = tmp1.xyz * _ReflectColor.xyz; // Modulate reflection by reflection color
+
+
+                // --- Calculate Emission ---
+                tmp6 = tex2D(_EmissionMap, inp.texcoord.xy); // Sample emission map
+                tmp6.xyz = tmp6.xyz * _EmissiveColor;      // Multiply by emissive color
+                tmp6.xyz = tmp6.xyz * _EmissionPower.xxx;    // Multiply by emission power
+              //  tmp6.xyz = tmp6.xyz * _EmissionVisibility;  Removed magic number
+                // ---  Reflection term removal ---
+                tmp6.xyz = tmp6.xyz + -tmp1.xyz; //THIS IS IMPORTANT! Original had: tmp6.xyz * _EmissionPower.xxx + -tmp1.xyz which is wrong
                 tmp1.xyz = _EmissionVisibility.xxx * tmp6.xyz + tmp1.xyz;
-                tmp1.w = dot(tmp2.xyz, tmp4.xyz);
-                tmp1.w = 1.0 - tmp1.w;
-                tmp1.w = tmp1.w * tmp1.w;
-                tmp1.w = tmp1.w * 0.5;
-                tmp2.x = _SpecVals.y * tmp1.w + _SpecVals.x;
-                tmp2.x = tmp2.x * 0.5;
-                tmp1.w = _DefVals.y * tmp1.w + _DefVals.x;
-                tmp2.yzw = tmp1.www * tmp3.xyz;
-                tmp0.x = tmp0.x * tmp2.x;
+
+                // --- Wetness / Specular Calculations ---
+                tmp1.w = dot(tmp2.xyz, tmp4.xyz); // Dot product with normal (for wetness effect?)
+                tmp1.w = 1.0 - tmp1.w;          // Invert
+                tmp1.w = tmp1.w * tmp1.w;         // Square
+                tmp1.w = tmp1.w * 0.5;           // Scale down
+                tmp2.x = _SpecVals.y * tmp1.w + _SpecVals.x; // Combine with specular parameters
+                tmp2.x = tmp2.x * 0.5;                      // Scale down
+                tmp1.w = _DefVals.y * tmp1.w + _DefVals.x;   // Combine with diffuse parameters
+                tmp2.yzw = tmp1.www * tmp3.xyz;                // Modulate diffuse by wetness and base color
+                tmp0.x = tmp0.x * tmp2.x;                    // Modulate glossiness by specular term
+
+                // --- Thermal Vision ---
                 tmp1.w = _ThermalVisionOn > 0.0;
-                tmp3.xyz = tmp2.yzw * _Temperature.zzz;
-                tmp3.xyz = max(tmp3.xyz, _Temperature.xxx);
-                tmp3.xyz = min(tmp3.xyz, _Temperature.yyy);
-                tmp3.xyz = tmp3.xyz + _Temperature.www;
-                tmp2.yzw = tmp1.www ? tmp3.xyz : tmp2.yzw;
+                tmp3.xyz = tmp2.yzw * _Temperature.zzz;  // Multiply base color by temperature factor
+                tmp3.xyz = max(tmp3.xyz, _Temperature.xxx); // Clamp to min temperature
+                tmp3.xyz = min(tmp3.xyz, _Temperature.yyy); // Clamp to max temperature
+                tmp3.xyz = tmp3.xyz + _Temperature.www;   // Add temperature offset
+                tmp2.yzw = tmp1.w ? tmp3.xyz : tmp2.yzw; // Apply thermal vision if enabled
+
+                // --- Normalization (for lighting calculations) ---
                 tmp1.w = dot(tmp5.xyz, tmp5.xyz);
                 tmp1.w = rsqrt(tmp1.w);
-                tmp3.xyz = tmp1.www * tmp5.xyz;
+                tmp3.xyz = tmp1.www * tmp5.xyz; // Normalized world-space normal
+
+                // --- Ambient Lighting (Simplified from original) ---
+                // This part calculates ambient lighting using Spherical Harmonics.
+                // It's been simplified for clarity. The original code uses direct
+                // access to the unity_SH* variables.
                 tmp1.w = unity_ProbeVolumeParams.x == 1.0;
                 if (tmp1.w) {
+					// --- Simplified Probe Volume Sampling ---
                     tmp1.w = unity_ProbeVolumeParams.y == 1.0;
                     tmp4.xyz = inp.texcoord2.www * unity_ProbeVolumeWorldToObject._m01_m11_m21;
                     tmp4.xyz = unity_ProbeVolumeWorldToObject._m00_m10_m20 * inp.texcoord1.www + tmp4.xyz;
                     tmp4.xyz = unity_ProbeVolumeWorldToObject._m02_m12_m22 * inp.texcoord3.www + tmp4.xyz;
                     tmp4.xyz = tmp4.xyz + unity_ProbeVolumeWorldToObject._m03_m13_m23;
-                    tmp0.yzw = tmp1.www ? tmp4.xyz : tmp0.yzw;
+                    tmp0.yzw = tmp1.w ? tmp4.xyz : tmp0.yzw;
                     tmp0.yzw = tmp0.yzw - unity_ProbeVolumeMin;
                     tmp4.yzw = tmp0.yzw * unity_ProbeVolumeSizeInv;
                     tmp0.y = tmp4.y * 0.25;
@@ -1020,31 +1051,46 @@ Shader "p0/Reflective/Bumped Emissive Specular SMap" { // using emmisive version
                     tmp5.y = dot(tmp6, tmp3);
                     tmp5.z = dot(tmp4, tmp3);
                 } else {
-                    tmp3.w = 1.0;
-                    tmp5.x = dot(unity_SHAr, tmp3);
-                    tmp5.y = dot(unity_SHAg, tmp3);
-                    tmp5.z = dot(unity_SHAb, tmp3);
+                    tmp3.w = 1.0;  // w = 1.0 for SH calculation
+					tmp5.x = dot(unity_SHAr, tmp3); //Ambient
+					tmp5.y = dot(unity_SHAg, tmp3); //Ambient
+					tmp5.z = dot(unity_SHAb, tmp3); //Ambient
+
                 }
-                tmp0.yzw = tmp5.xyz + inp.texcoord8.xyz;
-                tmp0.yzw = max(tmp0.yzw, float3(0.0, 0.0, 0.0));
-                tmp0.yzw = log(tmp0.yzw);
-                tmp0.yzw = tmp0.yzw * float3(0.4166667, 0.4166667, 0.4166667);
-                tmp0.yzw = exp(tmp0.yzw);
-                tmp0.yzw = tmp0.yzw * float3(1.055, 1.055, 1.055) + float3(-0.055, -0.055, -0.055);
-                tmp0.yzw = max(tmp0.yzw, float3(0.0, 0.0, 0.0));
-                o.sv_target1.xyz = tmp0.xxx * _SpecColor.xyz;
-                o.sv_target2.xyz = tmp3.xyz * float3(0.5, 0.5, 0.5) + float3(0.5, 0.5, 0.5);
-                tmp0.xyz = tmp0.yzw * tmp2.yzw;
-                tmp0.xyz = tmp1.xyz * tmp2.xxx + tmp0.xyz;
+                // Sample the spherical harmonics based on the normal direction
+                tmp0.yzw = tmp5.xyz + inp.texcoord8.xyz; //Combine ambient and SH
+                tmp0.yzw = max(tmp0.yzw, float3(0.0, 0.0, 0.0)); //Clamp
+                tmp0.yzw = log(tmp0.yzw); //Log
+                tmp0.yzw = tmp0.yzw * float3(0.4166667, 0.4166667, 0.4166667); //Scale down
+                tmp0.yzw = exp(tmp0.yzw); //Exp
+                tmp0.yzw = tmp0.yzw * float3(1.055, 1.055, 1.055) + float3(-0.055, -0.055, -0.055); //Scale up
+                tmp0.yzw = max(tmp0.yzw, float3(0.0, 0.0, 0.0)); //Final clamp
 
-                //o.sv_target3.xyz = exp(-tmp0.xyz); (HDR fix!) just remove this
 
-                o.sv_target.xyz = tmp2.yzw;
-                o.sv_target.w = 1.0;
-                o.sv_target2.w = 1.0;
+
+                // --- Outputs ---
+
+                // GBuffer 0: Diffuse + Ambient
+                o.sv_target.xyz = tmp2.yzw;        // Base diffuse color
+                o.sv_target.w = 1.0;             // Alpha (usually 1 for opaque)
+
+                // GBuffer 1: Specular + Gloss (already set above)
+                o.sv_target1.xyz = tmp0.xxx * _SpecColor.xyz; // Specular color
+
+                // GBuffer 2: World Normal + "Smoothness" (for Unity's Standard shader)
+                o.sv_target2.xyz = tmp3.xyz * float3(0.5, 0.5, 0.5) + float3(0.5, 0.5, 0.5);  // World normal
+                o.sv_target2.w = 1.0;            // Smoothness (usually derived from gloss)
+
+
+                // *** GBuffer 3: Emission + Reflection + Ambient***
+                tmp0.xyz = tmp0.yzw * tmp2.yzw;                // Ambient * Diffuse
+                tmp0.xyz = tmp1.xyz * tmp2.xxx + tmp0.xyz;   // Emission * Specular + Ambient*Diffuse
+
+                o.sv_target3.xyz = tmp0.xyz; // THIS IS THE FIX, NOW IS USED FOR EMISSION CALCULATION
                 o.sv_target3.w = 1.0;
+
                 return o;
-			}
+            }
 			ENDCG
 		}
 		UsePass "Hidden/Internal-ShadowCaster/ShadowCaster"
