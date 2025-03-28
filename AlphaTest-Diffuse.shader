@@ -1,8 +1,7 @@
-Shader "Legacy Shaders/Transparent/Cutout/Bumped Diffuse 2 side" {
+Shader "Legacy Shaders/Transparent/Cutout/Diffuse" {
 	Properties {
 		_Color ("Main Color", Color) = (1,1,1,1)
 		_MainTex ("Base (RGB) Trans (A)", 2D) = "white" {}
-		_BumpMap ("Normalmap", 2D) = "bump" {}
 		_Cutoff ("Alpha cutoff", Range(0, 1)) = 0.5
 	}
 	SubShader {
@@ -674,5 +673,5 @@ Shader "Legacy Shaders/Transparent/Cutout/Bumped Diffuse 2 side" {
 			ENDCG
 		}
 	}
-	Fallback "Legacy Shaders/Transparent/Cutout/Diffuse"
+	Fallback "Legacy Shaders/Transparent/Cutout/VertexLit"
 }
