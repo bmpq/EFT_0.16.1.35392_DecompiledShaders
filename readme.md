@@ -34,3 +34,16 @@ The main difference from the `SMap` version, is that it doesn't have the `_SpecM
 | `_BumpMap`      | `"Normalmap"`                  | `2D`              | `"bump" {}`       |                                                                                                           | `normalTexture = _BumpMap`                                                       |
 | `_SpecVals`     | `"Specular Vals"`              | `Vector`          | `(1.1,2,0,0)`     | Strength of Reflection Cubemap. (X) is the main, (Y) is multiplier at grazing angles, fresnel-like effect | *discard*                                                                        |
 | `_DefVals`      | `"Defuse Vals"`                | `Vector`          | `(0.5,0.7,0,0)`   | Diffuse multiplier. (X) is the main multiplier and (Y) is multiplier at grazing angles                    | `diffuseFactor.rgb *= _DefVals.x`                                                |
+
+
+#### `p0/Cutout/Bumped Diffuse`
+This shader supports transparency
+
+| Name        | Label                    | Type          | Default Value   | Notes              | Mapping (KHR_materials_pbrSpecularGlossiness)   |
+| :---------- | :----------------------- | :------------ | :-------------- | :----------------- | ----------------------------------------------- |
+| `_Color`    | `"Main Color"`           | `Color`       | `(1,1,1,1)`     |                    | `diffuseFactor = _Color`                        |
+| `_MainTex`  | `"Base (RGB) Trans (A)"` | `2D`          | `"white" {}`    |                    | `diffuseTexture.rgba = _MainTex.rgba`           |
+| `_BumpMap`  | `"Normalmap"`            | `2D`          | `"bump" {}`     |                    | `normalTexture = _BumpMap`                      |
+| `_Cutoff`   | `"Alpha cutoff"`         | `Range(0, 1)` | `0.5`           |                    | `alphaMode = "MASK"`<br>`alphaCutoff = _Cutoff` |
+| `_SpecVals` | `"Specular Vals"`        | `Vector`      | `(0.35,2,0,0)`  | Seems to be unused | *discard*                                       |
+| `_DefVals`  | `"Defuse Vals"`          | `Vector`      | `(0.1,2.5,0,0)` |                    | `diffuseFactor.rgb *= _DefVals.x`               |
