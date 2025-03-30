@@ -44,6 +44,33 @@ This shader supports transparency
 | `_Color`    | `"Main Color"`           | `Color`       | `(1,1,1,1)`     |                    | `diffuseFactor = _Color`                        |
 | `_MainTex`  | `"Base (RGB) Trans (A)"` | `2D`          | `"white" {}`    |                    | `diffuseTexture.rgba = _MainTex.rgba`           |
 | `_BumpMap`  | `"Normalmap"`            | `2D`          | `"bump" {}`     |                    | `normalTexture = _BumpMap`                      |
-| `_Cutoff`   | `"Alpha cutoff"`         | `Range(0, 1)` | `0.5`           |                    | `alphaMode = "MASK"`<br>`alphaCutoff = _Cutoff` |
+| `_Cutoff`   | `"Alpha cutoff"`         | `Range(0, 1)` | `0.5`           |                    | `alphaMode = "MASK"` `alphaCutoff = _Cutoff` |
 | `_SpecVals` | `"Specular Vals"`        | `Vector`      | `(0.35,2,0,0)`  | Seems to be unused | *discard*                                       |
 | `_DefVals`  | `"Defuse Vals"`          | `Vector`      | `(0.1,2.5,0,0)` |                    | `diffuseFactor.rgb *= _DefVals.x`               |
+
+
+#### `Cloth/ClothShader`
+Designed to be animated, flapping in the wind
+
+| Name                              | Label                    | Type           | Default Value | Notes                                                                             | Mapping (pbrMetallicRoughness)                     |
+| :-------------------------------- | :----------------------- | :------------- | :------------ | :-------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `_Color`                          | `"Main Color"`           | `Color`        | `(1,1,1,1)`   |                                                                                   | `baseColorFactor = _Color`                         |
+| `_MainTex`                        | `"Base (RGB)"`           | `2D`           | `"white" {}`  |                                                                                   | `baseColorTexture.rgb = _MainTex.rgb`              |
+| `_GlossMap`                       | `"Gloss map"`            | `2D`           | `"white" {}`  |                                                                                   | `metallicRoughnessTexture.g = 1 - _GlossMap.r`     |
+| `_NoiseTex`                       | `"Vertex Noise texture"` | `2D`           | `"grey" {}`   | the scrolling texture                                                             |                                                    |
+| `_NormalMap1`                     | `"NormalMap"`            | `2D`           | `"bump1" {}`  |                                                                                   | `normalTexture = _NormalMap1`                      |
+| `_NormalMap2`                     | `"NormalMap"`            | `2D`           | `"bump2" {}`  | normal map for the scrolling texture                                              |                                                    |
+| `_NormalsMask`                    |                          |                |               |                                                                                   |                                                    |
+| `_CutoutMask`                     |                          |                |               |                                                                                   | `diffuseTexture.a = _CutoutMask.a`                 |
+| `_CutoutMaskUVScale`              |                          |                |               |                                                                                   |                                                    |
+| `_Glossiness`                     | `"Smoothness"`           | `Range(-1, 1)` | `0.5`         | actual range that affect the visuals is `(0, 1)`, despite the property definition | `roughnessFactor = 1 - _Glossiness`                |
+| `_Metallic`                       | `"Metallic"`             | `Range(-1, 1)` | `0`           | weird range but seems to be used fully                                            | `metallicRoughnessTexture.b = (_Metallic + 1) / 2` |
+| `_ScrollXSpeed`                   |                          |                |               |                                                                                   |                                                    |
+| `_ScrollYSpeed`                   |                          |                |               |                                                                                   |                                                    |
+| `_ScrollSpeedRandomFactor`        |                          |                |               |                                                                                   |                                                    |
+| `_NormalBlendingRandomFactor`     |                          |                |               |                                                                                   |                                                    |
+| `_VertexTimeOffset`               |                          |                |               |                                                                                   |                                                    |
+| `_NormalBlendThreshold`           |                          |                |               |                                                                                   |                                                    |
+| `_VertexAnimationScale`           |                          |                |               |                                                                                   |                                                    |
+| `_VertexAnimationSpeedMultiplier` |                          |                |               |                                                                                   |                                                    |
+| `_CutOff`                         |                          |                |               |                                                                                   |                                                    |
