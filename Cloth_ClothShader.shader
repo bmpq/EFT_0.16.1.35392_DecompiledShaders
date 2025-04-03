@@ -8,10 +8,11 @@ Shader "Cloth/ClothShader" {
 		_NormalMap2 ("NormalMap", 2D) = "bump2" {}
 		_NormalsMask ("Normals Mask", 2D) = "normalmask" {}
 		_CutoutMask ("Cutout Mask", 2D) = "cutoutmask" {}
-		_Glossiness ("Smoothness", Range(0, 1)) = 0.5
-		_Metallic ("Metallic", Range(0, 1)) = 0
-		_ScrollXSpeed ("X Scroll Speed", Range(-1, 1)) = 0.1
-		_ScrollYSpeed ("Y Scroll Speed", Range(-1, 1)) = 0.1
+		_CutoutMaskUVScale ("Cutout mask UV coordinates scale", Float) = 1
+		_Glossiness ("Smoothness", Range(-1, 1)) = 0.5
+		_Metallic ("Metallic", Range(-1, 1)) = 0
+		_ScrollXSpeed ("X Scroll Speed", Range(0, 1)) = 0.1
+		_ScrollYSpeed ("Y Scroll Speed", Range(0, 1)) = 0.1
 		_ScrollSpeedRandomFactor ("Scroll Speed Random Factor", Float) = 1
 		_NormalBlendingRandomFactor ("Normal blending factor", Float) = 1
 		_VertexTimeOffset ("VertexOffset", Float) = 1
@@ -26,8 +27,7 @@ Shader "Cloth/ClothShader" {
 		Pass {
 			Name "FORWARD"
 			Tags { "LIGHTMODE" = "FORWARDBASE" "RenderType" = "Opaque" "SHADOWSUPPORT" = "true" }
-			Cull Off
-			GpuProgramID 53773
+			GpuProgramID 31806
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -61,6 +61,7 @@ Shader "Cloth/ClothShader" {
 			float4 _Color;
 			float _ScrollXSpeed;
 			float _ScrollYSpeed;
+			float _CutoutMaskUVScale;
 			float _ScrollSpeedRandomFactor;
 			float _NormalBlendThreshold;
 			float _NormalBlendingRandomFactor;
@@ -151,127 +152,123 @@ Shader "Cloth/ClothShader" {
                 float4 tmp4;
                 float4 tmp5;
                 float4 tmp6;
-                tmp0 = tex2D(_MainTex, inp.texcoord.xy);
-                tmp0 = tmp0 * _Color;
-                tmp1 = tex2Dlod(_CutoutMask, float4(inp.texcoord.xy, 0, 0.0));
-                tmp1.x = 1.0 - tmp1.x;
-                tmp1.x = tmp1.x * _CutOff;
-                tmp0.w = tmp0.w < tmp1.x;
-                if (tmp0.w) {
+                tmp0.xy = inp.texcoord.xy * _CutoutMaskUVScale.xx;
+                tmp1 = tex2D(_MainTex, tmp0.xy);
+                tmp0.z = tmp1.w * _Color.w;
+                tmp1 = tex2Dlod(_CutoutMask, float4(tmp0.xy, 0, 0.0));
+                tmp0.x = 1.0 - tmp1.x;
+                tmp0.x = tmp0.x * _CutOff;
+                tmp0.x = tmp0.z < tmp0.x;
+                if (tmp0.x) {
                     discard;
                 }
-                tmp1.y = inp.texcoord2.w;
-                tmp1.z = inp.texcoord3.w;
-                tmp1.w = inp.texcoord4.w;
-                tmp2.xyz = _WorldSpaceCameraPos - tmp1.yzw;
-                tmp0.w = dot(tmp2.xyz, tmp2.xyz);
-                tmp0.w = rsqrt(tmp0.w);
-                tmp2.xyz = tmp0.www * tmp2.xyz;
-                tmp0.w = tmp2.y * inp.texcoord3.z;
-                tmp0.w = inp.texcoord2.z * tmp2.x + tmp0.w;
-                tmp0.w = inp.texcoord4.z * tmp2.z + tmp0.w;
-                tmp3.xyz = float3(_ScrollXSpeed.x, _ScrollYSpeed.x, _ScrollSpeedRandomFactor.x) * _Time.yxy;
-                tmp4.yz = frac(tmp3.xz);
-                tmp1.x = cos(tmp3.y);
-                tmp4.x = tmp1.x * 0.1 + tmp4.y;
-                tmp3.xy = tmp4.xz + inp.texcoord1.xy;
-                tmp4 = tex2D(_GlossMap, inp.texcoord.xy);
-                tmp1.x = tmp4.x * _Metallic;
-                tmp4 = tex2D(_NormalMap1, inp.texcoord.zw);
-                tmp4.x = tmp4.w * tmp4.x;
-                tmp4.xy = tmp4.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
-                tmp2.w = dot(tmp4.xy, tmp4.xy);
-                tmp2.w = min(tmp2.w, 1.0);
-                tmp2.w = 1.0 - tmp2.w;
-                tmp4.z = sqrt(tmp2.w);
-                tmp3 = tex2D(_NormalMap2, tmp3.xy);
+                tmp0.xyz = float3(_ScrollXSpeed.x, _ScrollYSpeed.x, _ScrollSpeedRandomFactor.x) * _Time.yxy;
+                tmp1.yz = frac(tmp0.xz);
+                tmp0.x = cos(tmp0.y);
+                tmp1.x = tmp0.x * 0.1 + tmp1.y;
+                tmp0.xy = tmp1.xz + inp.texcoord1.xy;
+                tmp1 = tex2D(_MainTex, inp.texcoord.xy);
+                tmp1.xyz = tmp1.xyz * _Color.xyz;
+                tmp2 = tex2D(_GlossMap, inp.texcoord.xy);
+                tmp0.z = tmp2.x * _Metallic;
+                tmp2 = tex2D(_NormalMap1, inp.texcoord.zw);
+                tmp2.x = tmp2.w * tmp2.x;
+                tmp2.xy = tmp2.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
+                tmp0.w = dot(tmp2.xy, tmp2.xy);
+                tmp0.w = min(tmp0.w, 1.0);
+                tmp0.w = 1.0 - tmp0.w;
+                tmp2.z = sqrt(tmp0.w);
+                tmp3 = tex2D(_NormalMap2, tmp0.xy);
                 tmp3.x = tmp3.w * tmp3.x;
                 tmp3.xy = tmp3.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
-                tmp2.w = dot(tmp3.xy, tmp3.xy);
-                tmp2.w = min(tmp2.w, 1.0);
-                tmp2.w = 1.0 - tmp2.w;
-                tmp3.z = sqrt(tmp2.w);
-                tmp2.w = _NormalBlendingRandomFactor * _Time.x;
-                tmp2.w = cos(tmp2.w);
-                tmp2.w = tmp2.w * 0.4;
+                tmp0.x = dot(tmp3.xy, tmp3.xy);
+                tmp0.x = min(tmp0.x, 1.0);
+                tmp0.x = 1.0 - tmp0.x;
+                tmp3.z = sqrt(tmp0.x);
+                tmp0.x = _NormalBlendingRandomFactor * _Time.x;
+                tmp0.x = cos(tmp0.x);
+                tmp0.x = tmp0.x * 0.4;
                 tmp3.xyz = tmp3.xyz * _NormalBlendThreshold.xxx;
-                tmp3.xyz = tmp3.xyz * tmp2.www + tmp4.xyz;
-                tmp5 = tex2D(_NormalsMask, inp.texcoord.xy);
-                tmp0.w = tmp0.w > 0.0;
-                tmp4.xyz = tmp0.www ? tmp4.xyz : -tmp4.xyz;
-                tmp3.xyz = tmp0.www ? tmp3.xyz : -tmp3.xyz;
-                tmp3.xyz = tmp3.xyz - tmp4.xyz;
-                tmp3.xyz = tmp5.xxx * tmp3.xyz + tmp4.xyz;
-                tmp0.w = dot(tmp3.xyz, tmp3.xyz);
-                tmp0.w = rsqrt(tmp0.w);
-                tmp3.xyz = tmp0.www * tmp3.xyz;
-                tmp0.w = _ThermalVisionOn > 0.0;
-                tmp4.xyz = tmp0.xyz * _Temperature.zzz;
-                tmp4.xyz = max(tmp4.xyz, _Temperature.xxx);
-                tmp4.xyz = min(tmp4.xyz, _Temperature.yyy);
-                tmp4.xyz = tmp4.xyz + _Temperature.www;
-                tmp0.xyz = tmp0.www ? tmp4.xyz : tmp0.xyz;
-                tmp0.w = unity_ProbeVolumeParams.x == 1.0;
-                if (tmp0.w) {
-                    tmp0.w = unity_ProbeVolumeParams.y == 1.0;
+                tmp0.xyw = tmp0.xxx * tmp3.xyz;
+                tmp3 = tex2D(_NormalsMask, inp.texcoord.xy);
+                tmp0.xyw = tmp3.xxx * tmp0.xyw + tmp2.xyz;
+                tmp1.w = dot(tmp0.xyz, tmp0.xyz);
+                tmp1.w = rsqrt(tmp1.w);
+                tmp0.xyw = tmp0.xyw * tmp1.www;
+                tmp1.w = _ThermalVisionOn > 0.0;
+                tmp2.xyz = tmp1.xyz * _Temperature.zzz;
+                tmp2.xyz = max(tmp2.xyz, _Temperature.xxx);
+                tmp2.xyz = min(tmp2.xyz, _Temperature.yyy);
+                tmp2.xyz = tmp2.xyz + _Temperature.www;
+                tmp1.xyz = tmp1.www ? tmp2.xyz : tmp1.xyz;
+                tmp2.y = inp.texcoord2.w;
+                tmp2.z = inp.texcoord3.w;
+                tmp2.w = inp.texcoord4.w;
+                tmp3.xyz = _WorldSpaceCameraPos - tmp2.yzw;
+                tmp1.w = dot(tmp3.xyz, tmp3.xyz);
+                tmp1.w = rsqrt(tmp1.w);
+                tmp3.xyz = tmp1.www * tmp3.xyz;
+                tmp1.w = unity_ProbeVolumeParams.x == 1.0;
+                if (tmp1.w) {
+                    tmp1.w = unity_ProbeVolumeParams.y == 1.0;
                     tmp4.xyz = inp.texcoord3.www * unity_ProbeVolumeWorldToObject._m01_m11_m21;
                     tmp4.xyz = unity_ProbeVolumeWorldToObject._m00_m10_m20 * inp.texcoord2.www + tmp4.xyz;
                     tmp4.xyz = unity_ProbeVolumeWorldToObject._m02_m12_m22 * inp.texcoord4.www + tmp4.xyz;
                     tmp4.xyz = tmp4.xyz + unity_ProbeVolumeWorldToObject._m03_m13_m23;
-                    tmp1.yzw = tmp0.www ? tmp4.xyz : tmp1.yzw;
-                    tmp1.yzw = tmp1.yzw - unity_ProbeVolumeMin;
-                    tmp4.yzw = tmp1.yzw * unity_ProbeVolumeSizeInv;
-                    tmp0.w = tmp4.y * 0.25 + 0.75;
-                    tmp1.y = unity_ProbeVolumeParams.z * 0.5 + 0.75;
-                    tmp4.x = max(tmp0.w, tmp1.y);
-                    tmp4 = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, tmp4.xzw);
+                    tmp2.xyz = tmp1.www ? tmp4.xyz : tmp2.yzw;
+                    tmp2.xyz = tmp2.xyz - unity_ProbeVolumeMin;
+                    tmp2.yzw = tmp2.xyz * unity_ProbeVolumeSizeInv;
+                    tmp1.w = tmp2.y * 0.25 + 0.75;
+                    tmp2.y = unity_ProbeVolumeParams.z * 0.5 + 0.75;
+                    tmp2.x = max(tmp1.w, tmp2.y);
+                    tmp2 = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, tmp2.xzw);
                 } else {
-                    tmp4 = float4(1.0, 1.0, 1.0, 1.0);
+                    tmp2 = float4(1.0, 1.0, 1.0, 1.0);
                 }
-                tmp0.w = saturate(dot(tmp4, unity_OcclusionMaskSelector));
-                tmp4.x = dot(inp.texcoord2.xyz, tmp3.xyz);
-                tmp4.y = dot(inp.texcoord3.xyz, tmp3.xyz);
-                tmp4.z = dot(inp.texcoord4.xyz, tmp3.xyz);
-                tmp1.y = dot(tmp4.xyz, tmp4.xyz);
-                tmp1.y = rsqrt(tmp1.y);
-                tmp1.yzw = tmp1.yyy * tmp4.xyz;
-                tmp3.xw = float2(1.0, 1.0) - _Glossiness.xx;
-                tmp2.w = dot(-tmp2.xyz, tmp1.xyz);
-                tmp2.w = tmp2.w + tmp2.w;
-                tmp4.xyz = tmp1.yzw * -tmp2.www + -tmp2.xyz;
-                tmp5.xyz = tmp0.www * _LightColor0.xyz;
-                tmp0.w = -tmp3.x * 0.7 + 1.7;
-                tmp0.w = tmp0.w * tmp3.x;
-                tmp0.w = tmp0.w * 6.0;
-                tmp4 = UNITY_SAMPLE_TEXCUBE_SAMPLER(unity_SpecCube0, unity_SpecCube0, float4(tmp4.xyz, tmp0.w));
-                tmp0.w = tmp4.w - 1.0;
-                tmp0.w = unity_SpecCube0_HDR.w * tmp0.w + 1.0;
-                tmp0.w = tmp0.w * unity_SpecCube0_HDR.x;
-                tmp4.xyz = tmp4.xyz * tmp0.www;
-                tmp6.xyz = tmp0.xyz - float3(0.2209163, 0.2209163, 0.2209163);
-                tmp6.xyz = tmp1.xxx * tmp6.xyz + float3(0.2209163, 0.2209163, 0.2209163);
-                tmp0.w = -tmp1.x * 0.7790837 + 0.7790837;
-                tmp1.x = dot(tmp2.xyz, tmp1.xyz);
-                tmp2.w = tmp1.x + tmp1.x;
-                tmp2.xyz = tmp1.yzw * -tmp2.www + tmp2.xyz;
-                tmp1.y = saturate(dot(tmp1.xyz, _WorldSpaceLightPos0.xyz));
-                tmp1.x = saturate(tmp1.x);
-                tmp2.x = dot(tmp2.xyz, _WorldSpaceLightPos0.xyz);
-                tmp2.y = 1.0 - tmp1.x;
-                tmp2.zw = tmp2.xy * tmp2.xy;
-                tmp1.xz = tmp2.xy * tmp2.xw;
-                tmp3.yz = tmp2.zy * tmp1.xz;
-                tmp1.x = _Glossiness - tmp0.w;
-                tmp1.x = saturate(tmp1.x + 1.0);
-                tmp2 = tex2D(unity_NHxRoughness, tmp3.yw);
-                tmp1.z = tmp2.x * 16.0;
-                tmp2.xyz = tmp6.xyz * tmp1.zzz;
-                tmp0.xyz = tmp0.xyz * tmp0.www + tmp2.xyz;
-                tmp1.yzw = tmp1.yyy * tmp5.xyz;
-                tmp2.xyz = tmp1.xxx - tmp6.xyz;
-                tmp2.xyz = tmp3.zzz * tmp2.xyz + tmp6.xyz;
+                tmp1.w = saturate(dot(tmp2, unity_OcclusionMaskSelector));
+                tmp2.x = dot(inp.texcoord2.xyz, tmp0.xyz);
+                tmp2.y = dot(inp.texcoord3.xyz, tmp0.xyz);
+                tmp2.z = dot(inp.texcoord4.xyz, tmp0.xyz);
+                tmp0.x = dot(tmp2.xyz, tmp2.xyz);
+                tmp0.x = rsqrt(tmp0.x);
+                tmp0.xyw = tmp0.xxx * tmp2.xyz;
+                tmp2.xw = float2(1.0, 1.0) - _Glossiness.xx;
+                tmp3.w = dot(-tmp3.xyz, tmp0.xyz);
+                tmp3.w = tmp3.w + tmp3.w;
+                tmp4.xyz = tmp0.xyw * -tmp3.www + -tmp3.xyz;
+                tmp5.xyz = tmp1.www * _LightColor0.xyz;
+                tmp1.w = -tmp2.x * 0.7 + 1.7;
+                tmp1.w = tmp1.w * tmp2.x;
+                tmp1.w = tmp1.w * 6.0;
+                tmp4 = UNITY_SAMPLE_TEXCUBE_SAMPLER(unity_SpecCube0, unity_SpecCube0, float4(tmp4.xyz, tmp1.w));
+                tmp1.w = tmp4.w - 1.0;
+                tmp1.w = unity_SpecCube0_HDR.w * tmp1.w + 1.0;
+                tmp1.w = tmp1.w * unity_SpecCube0_HDR.x;
+                tmp4.xyz = tmp4.xyz * tmp1.www;
+                tmp6.xyz = tmp1.xyz - float3(0.2209163, 0.2209163, 0.2209163);
+                tmp6.xyz = tmp0.zzz * tmp6.xyz + float3(0.2209163, 0.2209163, 0.2209163);
+                tmp0.z = -tmp0.z * 0.7790837 + 0.7790837;
+                tmp1.w = dot(tmp3.xyz, tmp0.xyz);
+                tmp2.x = tmp1.w + tmp1.w;
+                tmp3.xyz = tmp0.xyw * -tmp2.xxx + tmp3.xyz;
+                tmp0.x = saturate(dot(tmp0.xyz, _WorldSpaceLightPos0.xyz));
+                tmp1.w = saturate(tmp1.w);
+                tmp3.x = dot(tmp3.xyz, _WorldSpaceLightPos0.xyz);
+                tmp3.y = 1.0 - tmp1.w;
+                tmp3.zw = tmp3.xy * tmp3.xy;
+                tmp0.yw = tmp3.xy * tmp3.xw;
+                tmp2.yz = tmp3.zy * tmp0.yw;
+                tmp0.y = _Glossiness - tmp0.z;
+                tmp0.y = saturate(tmp0.y + 1.0);
+                tmp3 = tex2D(unity_NHxRoughness, tmp2.yw);
+                tmp0.w = tmp3.x * 16.0;
+                tmp2.xyw = tmp6.xyz * tmp0.www;
+                tmp1.xyz = tmp1.xyz * tmp0.zzz + tmp2.xyw;
+                tmp0.xzw = tmp0.xxx * tmp5.xyz;
+                tmp2.xyw = tmp0.yyy - tmp6.xyz;
+                tmp2.xyz = tmp2.zzz * tmp2.xyw + tmp6.xyz;
                 tmp2.xyz = tmp2.xyz * tmp4.xyz;
-                o.sv_target.xyz = tmp0.xyz * tmp1.yzw + tmp2.xyz;
+                o.sv_target.xyz = tmp1.xyz * tmp0.xzw + tmp2.xyz;
                 o.sv_target.w = 1.0;
                 return o;
 			}
@@ -282,8 +279,7 @@ Shader "Cloth/ClothShader" {
 			Tags { "LIGHTMODE" = "FORWARDADD" "RenderType" = "Opaque" "SHADOWSUPPORT" = "true" }
 			Blend One One, One One
 			ZWrite Off
-			Cull Off
-			GpuProgramID 95713
+			GpuProgramID 110348
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -319,6 +315,7 @@ Shader "Cloth/ClothShader" {
 			float4 _Color;
 			float _ScrollXSpeed;
 			float _ScrollYSpeed;
+			float _CutoutMaskUVScale;
 			float _ScrollSpeedRandomFactor;
 			float _NormalBlendThreshold;
 			float _NormalBlendingRandomFactor;
@@ -416,119 +413,115 @@ Shader "Cloth/ClothShader" {
                 float4 tmp4;
                 float4 tmp5;
                 float4 tmp6;
-                tmp0 = tex2D(_MainTex, inp.texcoord.xy);
-                tmp0 = tmp0 * _Color;
-                tmp1 = tex2Dlod(_CutoutMask, float4(inp.texcoord.xy, 0, 0.0));
-                tmp1.x = 1.0 - tmp1.x;
-                tmp1.x = tmp1.x * _CutOff;
-                tmp0.w = tmp0.w < tmp1.x;
-                if (tmp0.w) {
+                tmp0.xy = inp.texcoord.xy * _CutoutMaskUVScale.xx;
+                tmp1 = tex2D(_MainTex, tmp0.xy);
+                tmp0.z = tmp1.w * _Color.w;
+                tmp1 = tex2Dlod(_CutoutMask, float4(tmp0.xy, 0, 0.0));
+                tmp0.x = 1.0 - tmp1.x;
+                tmp0.x = tmp0.x * _CutOff;
+                tmp0.x = tmp0.z < tmp0.x;
+                if (tmp0.x) {
                     discard;
                 }
-                tmp1.y = inp.texcoord2.w;
-                tmp1.z = inp.texcoord3.w;
-                tmp1.w = inp.texcoord4.w;
-                tmp2.xyz = _WorldSpaceCameraPos - tmp1.yzw;
-                tmp0.w = dot(tmp2.xyz, tmp2.xyz);
-                tmp0.w = rsqrt(tmp0.w);
-                tmp2.xyz = tmp0.www * tmp2.xyz;
-                tmp0.w = tmp2.y * inp.texcoord3.z;
-                tmp0.w = inp.texcoord2.z * tmp2.x + tmp0.w;
-                tmp0.w = inp.texcoord4.z * tmp2.z + tmp0.w;
-                tmp3.xyz = float3(_ScrollXSpeed.x, _ScrollYSpeed.x, _ScrollSpeedRandomFactor.x) * _Time.yxy;
-                tmp4.yz = frac(tmp3.xz);
-                tmp1.x = cos(tmp3.y);
-                tmp4.x = tmp1.x * 0.1 + tmp4.y;
-                tmp3.xy = tmp4.xz + inp.texcoord1.xy;
-                tmp4 = tex2D(_GlossMap, inp.texcoord.xy);
-                tmp1.x = tmp4.x * _Metallic;
-                tmp4 = tex2D(_NormalMap1, inp.texcoord.zw);
-                tmp4.x = tmp4.w * tmp4.x;
-                tmp4.xy = tmp4.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
-                tmp2.w = dot(tmp4.xy, tmp4.xy);
-                tmp2.w = min(tmp2.w, 1.0);
-                tmp2.w = 1.0 - tmp2.w;
-                tmp4.z = sqrt(tmp2.w);
-                tmp3 = tex2D(_NormalMap2, tmp3.xy);
+                tmp0.xyz = float3(_ScrollXSpeed.x, _ScrollYSpeed.x, _ScrollSpeedRandomFactor.x) * _Time.yxy;
+                tmp1.yz = frac(tmp0.xz);
+                tmp0.x = cos(tmp0.y);
+                tmp1.x = tmp0.x * 0.1 + tmp1.y;
+                tmp0.xy = tmp1.xz + inp.texcoord1.xy;
+                tmp1 = tex2D(_MainTex, inp.texcoord.xy);
+                tmp1.xyz = tmp1.xyz * _Color.xyz;
+                tmp2 = tex2D(_GlossMap, inp.texcoord.xy);
+                tmp0.z = tmp2.x * _Metallic;
+                tmp2 = tex2D(_NormalMap1, inp.texcoord.zw);
+                tmp2.x = tmp2.w * tmp2.x;
+                tmp2.xy = tmp2.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
+                tmp0.w = dot(tmp2.xy, tmp2.xy);
+                tmp0.w = min(tmp0.w, 1.0);
+                tmp0.w = 1.0 - tmp0.w;
+                tmp2.z = sqrt(tmp0.w);
+                tmp3 = tex2D(_NormalMap2, tmp0.xy);
                 tmp3.x = tmp3.w * tmp3.x;
                 tmp3.xy = tmp3.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
-                tmp2.w = dot(tmp3.xy, tmp3.xy);
-                tmp2.w = min(tmp2.w, 1.0);
-                tmp2.w = 1.0 - tmp2.w;
-                tmp3.z = sqrt(tmp2.w);
-                tmp2.w = _NormalBlendingRandomFactor * _Time.x;
-                tmp2.w = cos(tmp2.w);
-                tmp2.w = tmp2.w * 0.4;
+                tmp0.x = dot(tmp3.xy, tmp3.xy);
+                tmp0.x = min(tmp0.x, 1.0);
+                tmp0.x = 1.0 - tmp0.x;
+                tmp3.z = sqrt(tmp0.x);
+                tmp0.x = _NormalBlendingRandomFactor * _Time.x;
+                tmp0.x = cos(tmp0.x);
+                tmp0.x = tmp0.x * 0.4;
                 tmp3.xyz = tmp3.xyz * _NormalBlendThreshold.xxx;
-                tmp3.xyz = tmp3.xyz * tmp2.www + tmp4.xyz;
-                tmp5 = tex2D(_NormalsMask, inp.texcoord.xy);
-                tmp0.w = tmp0.w > 0.0;
-                tmp4.xyz = tmp0.www ? tmp4.xyz : -tmp4.xyz;
-                tmp3.xyz = tmp0.www ? tmp3.xyz : -tmp3.xyz;
-                tmp3.xyz = tmp3.xyz - tmp4.xyz;
-                tmp3.xyz = tmp5.xxx * tmp3.xyz + tmp4.xyz;
-                tmp0.w = dot(tmp3.xyz, tmp3.xyz);
-                tmp0.w = rsqrt(tmp0.w);
-                tmp3.xyz = tmp0.www * tmp3.xyz;
-                tmp0.w = _ThermalVisionOn > 0.0;
-                tmp4.xyz = tmp0.xyz * _Temperature.zzz;
-                tmp4.xyz = max(tmp4.xyz, _Temperature.xxx);
-                tmp4.xyz = min(tmp4.xyz, _Temperature.yyy);
-                tmp4.xyz = tmp4.xyz + _Temperature.www;
-                tmp0.xyz = tmp0.www ? tmp4.xyz : tmp0.xyz;
-                tmp4.xyz = _WorldSpaceLightPos0.xyz - tmp1.yzw;
-                tmp0.w = dot(tmp4.xyz, tmp4.xyz);
-                tmp0.w = rsqrt(tmp0.w);
-                tmp4.xyz = tmp0.www * tmp4.xyz;
+                tmp0.xyw = tmp0.xxx * tmp3.xyz;
+                tmp3 = tex2D(_NormalsMask, inp.texcoord.xy);
+                tmp0.xyw = tmp3.xxx * tmp0.xyw + tmp2.xyz;
+                tmp1.w = dot(tmp0.xyz, tmp0.xyz);
+                tmp1.w = rsqrt(tmp1.w);
+                tmp0.xyw = tmp0.xyw * tmp1.www;
+                tmp1.w = _ThermalVisionOn > 0.0;
+                tmp2.xyz = tmp1.xyz * _Temperature.zzz;
+                tmp2.xyz = max(tmp2.xyz, _Temperature.xxx);
+                tmp2.xyz = min(tmp2.xyz, _Temperature.yyy);
+                tmp2.xyz = tmp2.xyz + _Temperature.www;
+                tmp1.xyz = tmp1.www ? tmp2.xyz : tmp1.xyz;
+                tmp2.y = inp.texcoord2.w;
+                tmp2.z = inp.texcoord3.w;
+                tmp2.w = inp.texcoord4.w;
+                tmp3.xyz = _WorldSpaceLightPos0.xyz - tmp2.yzw;
+                tmp1.w = dot(tmp3.xyz, tmp3.xyz);
+                tmp1.w = rsqrt(tmp1.w);
+                tmp3.xyz = tmp1.www * tmp3.xyz;
+                tmp4.xyz = _WorldSpaceCameraPos - tmp2.yzw;
+                tmp1.w = dot(tmp4.xyz, tmp4.xyz);
+                tmp1.w = rsqrt(tmp1.w);
+                tmp4.xyz = tmp1.www * tmp4.xyz;
                 tmp5.xyz = inp.texcoord3.www * unity_WorldToLight._m01_m11_m21;
                 tmp5.xyz = unity_WorldToLight._m00_m10_m20 * inp.texcoord2.www + tmp5.xyz;
                 tmp5.xyz = unity_WorldToLight._m02_m12_m22 * inp.texcoord4.www + tmp5.xyz;
                 tmp5.xyz = tmp5.xyz + unity_WorldToLight._m03_m13_m23;
-                tmp0.w = unity_ProbeVolumeParams.x == 1.0;
-                if (tmp0.w) {
-                    tmp0.w = unity_ProbeVolumeParams.y == 1.0;
+                tmp1.w = unity_ProbeVolumeParams.x == 1.0;
+                if (tmp1.w) {
+                    tmp1.w = unity_ProbeVolumeParams.y == 1.0;
                     tmp6.xyz = inp.texcoord3.www * unity_ProbeVolumeWorldToObject._m01_m11_m21;
                     tmp6.xyz = unity_ProbeVolumeWorldToObject._m00_m10_m20 * inp.texcoord2.www + tmp6.xyz;
                     tmp6.xyz = unity_ProbeVolumeWorldToObject._m02_m12_m22 * inp.texcoord4.www + tmp6.xyz;
                     tmp6.xyz = tmp6.xyz + unity_ProbeVolumeWorldToObject._m03_m13_m23;
-                    tmp1.yzw = tmp0.www ? tmp6.xyz : tmp1.yzw;
-                    tmp1.yzw = tmp1.yzw - unity_ProbeVolumeMin;
-                    tmp6.yzw = tmp1.yzw * unity_ProbeVolumeSizeInv;
-                    tmp0.w = tmp6.y * 0.25 + 0.75;
-                    tmp1.y = unity_ProbeVolumeParams.z * 0.5 + 0.75;
-                    tmp6.x = max(tmp0.w, tmp1.y);
-                    tmp6 = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, tmp6.xzw);
+                    tmp2.xyz = tmp1.www ? tmp6.xyz : tmp2.yzw;
+                    tmp2.xyz = tmp2.xyz - unity_ProbeVolumeMin;
+                    tmp2.yzw = tmp2.xyz * unity_ProbeVolumeSizeInv;
+                    tmp1.w = tmp2.y * 0.25 + 0.75;
+                    tmp2.y = unity_ProbeVolumeParams.z * 0.5 + 0.75;
+                    tmp2.x = max(tmp1.w, tmp2.y);
+                    tmp2 = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, tmp2.xzw);
                 } else {
-                    tmp6 = float4(1.0, 1.0, 1.0, 1.0);
+                    tmp2 = float4(1.0, 1.0, 1.0, 1.0);
                 }
-                tmp0.w = saturate(dot(tmp6, unity_OcclusionMaskSelector));
-                tmp1.y = dot(tmp5.xyz, tmp5.xyz);
-                tmp5 = tex2D(_LightTexture0, tmp1.yy);
-                tmp0.w = tmp0.w * tmp5.x;
-                tmp5.x = dot(inp.texcoord2.xyz, tmp3.xyz);
-                tmp5.y = dot(inp.texcoord3.xyz, tmp3.xyz);
-                tmp5.z = dot(inp.texcoord4.xyz, tmp3.xyz);
-                tmp1.y = dot(tmp5.xyz, tmp5.xyz);
-                tmp1.y = rsqrt(tmp1.y);
-                tmp1.yzw = tmp1.yyy * tmp5.xyz;
-                tmp3.xyz = tmp0.www * _LightColor0.xyz;
-                tmp5.xyz = tmp0.xyz - float3(0.2209163, 0.2209163, 0.2209163);
-                tmp5.xyz = tmp1.xxx * tmp5.xyz + float3(0.2209163, 0.2209163, 0.2209163);
-                tmp0.w = -tmp1.x * 0.7790837 + 0.7790837;
-                tmp1.x = dot(tmp2.xyz, tmp1.xyz);
-                tmp1.x = tmp1.x + tmp1.x;
-                tmp2.xyz = tmp1.yzw * -tmp1.xxx + tmp2.xyz;
-                tmp1.x = saturate(dot(tmp1.xyz, tmp4.xyz));
-                tmp1.y = dot(tmp2.xyz, tmp4.xyz);
-                tmp1.y = tmp1.y * tmp1.y;
-                tmp2.x = tmp1.y * tmp1.y;
-                tmp2.y = 1.0 - _Glossiness;
-                tmp2 = tex2D(unity_NHxRoughness, tmp2.xy);
-                tmp1.y = tmp2.x * 16.0;
-                tmp1.yzw = tmp5.xyz * tmp1.yyy;
-                tmp0.xyz = tmp0.xyz * tmp0.www + tmp1.yzw;
-                tmp1.xyz = tmp1.xxx * tmp3.xyz;
-                o.sv_target.xyz = tmp0.xyz * tmp1.xyz;
+                tmp1.w = saturate(dot(tmp2, unity_OcclusionMaskSelector));
+                tmp2.x = dot(tmp5.xyz, tmp5.xyz);
+                tmp2 = tex2D(_LightTexture0, tmp2.xx);
+                tmp1.w = tmp1.w * tmp2.x;
+                tmp2.x = dot(inp.texcoord2.xyz, tmp0.xyz);
+                tmp2.y = dot(inp.texcoord3.xyz, tmp0.xyz);
+                tmp2.z = dot(inp.texcoord4.xyz, tmp0.xyz);
+                tmp0.x = dot(tmp2.xyz, tmp2.xyz);
+                tmp0.x = rsqrt(tmp0.x);
+                tmp0.xyw = tmp0.xxx * tmp2.xyz;
+                tmp2.xyz = tmp1.www * _LightColor0.xyz;
+                tmp5.xyz = tmp1.xyz - float3(0.2209163, 0.2209163, 0.2209163);
+                tmp5.xyz = tmp0.zzz * tmp5.xyz + float3(0.2209163, 0.2209163, 0.2209163);
+                tmp0.z = -tmp0.z * 0.7790837 + 0.7790837;
+                tmp1.w = dot(tmp4.xyz, tmp0.xyz);
+                tmp1.w = tmp1.w + tmp1.w;
+                tmp4.xyz = tmp0.xyw * -tmp1.www + tmp4.xyz;
+                tmp0.x = saturate(dot(tmp0.xyz, tmp3.xyz));
+                tmp0.y = dot(tmp4.xyz, tmp3.xyz);
+                tmp0.y = tmp0.y * tmp0.y;
+                tmp3.x = tmp0.y * tmp0.y;
+                tmp3.y = 1.0 - _Glossiness;
+                tmp3 = tex2D(unity_NHxRoughness, tmp3.xy);
+                tmp0.y = tmp3.x * 16.0;
+                tmp3.xyz = tmp5.xyz * tmp0.yyy;
+                tmp0.yzw = tmp1.xyz * tmp0.zzz + tmp3.xyz;
+                tmp1.xyz = tmp0.xxx * tmp2.xyz;
+                o.sv_target.xyz = tmp0.yzw * tmp1.xyz;
                 o.sv_target.w = 1.0;
                 return o;
 			}
@@ -537,8 +530,7 @@ Shader "Cloth/ClothShader" {
 		Pass {
 			Name "DEFERRED"
 			Tags { "LIGHTMODE" = "DEFERRED" "RenderType" = "Opaque" }
-			Cull Off
-			GpuProgramID 155704
+			GpuProgramID 160882
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -552,7 +544,6 @@ Shader "Cloth/ClothShader" {
 				float4 texcoord2 : TEXCOORD2;
 				float4 texcoord3 : TEXCOORD3;
 				float4 texcoord4 : TEXCOORD4;
-				float3 texcoord5 : TEXCOORD5;
 				float4 texcoord6 : TEXCOORD6;
 			};
 			struct fout
@@ -575,6 +566,7 @@ Shader "Cloth/ClothShader" {
 			float4 _Color;
 			float _ScrollXSpeed;
 			float _ScrollYSpeed;
+			float _CutoutMaskUVScale;
 			float _ScrollSpeedRandomFactor;
 			float _NormalBlendThreshold;
 			float _NormalBlendingRandomFactor;
@@ -623,36 +615,32 @@ Shader "Cloth/ClothShader" {
                 o.texcoord.zw = v.texcoord.xy * _NormalMap1_ST.xy + _NormalMap1_ST.zw;
                 o.texcoord1.xy = v.texcoord.xy * _NormalMap2_ST.xy + _NormalMap2_ST.zw;
                 o.texcoord2.w = tmp0.x;
-                tmp0.w = v.tangent.w * unity_WorldTransformParams.w;
-                tmp1.x = dot(v.normal.xyz, unity_WorldToObject._m00_m10_m20);
-                tmp1.y = dot(v.normal.xyz, unity_WorldToObject._m01_m11_m21);
-                tmp1.z = dot(v.normal.xyz, unity_WorldToObject._m02_m12_m22);
-                tmp1.w = dot(tmp1.xyz, tmp1.xyz);
-                tmp1.w = rsqrt(tmp1.w);
-                tmp1.xyz = tmp1.www * tmp1.xyz;
-                tmp2.xyz = v.tangent.yyy * unity_ObjectToWorld._m01_m11_m21;
-                tmp2.xyz = unity_ObjectToWorld._m00_m10_m20 * v.tangent.xxx + tmp2.xyz;
-                tmp2.xyz = unity_ObjectToWorld._m02_m12_m22 * v.tangent.zzz + tmp2.xyz;
-                tmp1.w = dot(tmp2.xyz, tmp2.xyz);
-                tmp1.w = rsqrt(tmp1.w);
-                tmp2.xyz = tmp1.www * tmp2.xyz;
-                tmp3.xyz = tmp1.zxy * tmp2.yzx;
-                tmp3.xyz = tmp1.yzx * tmp2.zxy + -tmp3.xyz;
-                tmp3.xyz = tmp0.www * tmp3.xyz;
+                tmp1.y = dot(v.normal.xyz, unity_WorldToObject._m00_m10_m20);
+                tmp1.z = dot(v.normal.xyz, unity_WorldToObject._m01_m11_m21);
+                tmp1.x = dot(v.normal.xyz, unity_WorldToObject._m02_m12_m22);
+                tmp0.x = dot(tmp1.xyz, tmp1.xyz);
+                tmp0.x = rsqrt(tmp0.x);
+                tmp1.xyz = tmp0.xxx * tmp1.xyz;
+                tmp2.xyz = v.tangent.yyy * unity_ObjectToWorld._m11_m21_m01;
+                tmp2.xyz = unity_ObjectToWorld._m10_m20_m00 * v.tangent.xxx + tmp2.xyz;
+                tmp2.xyz = unity_ObjectToWorld._m12_m22_m02 * v.tangent.zzz + tmp2.xyz;
+                tmp0.x = dot(tmp2.xyz, tmp2.xyz);
+                tmp0.x = rsqrt(tmp0.x);
+                tmp2.xyz = tmp0.xxx * tmp2.xyz;
+                tmp3.xyz = tmp1.xyz * tmp2.xyz;
+                tmp3.xyz = tmp1.zxy * tmp2.yzx + -tmp3.xyz;
+                tmp0.x = v.tangent.w * unity_WorldTransformParams.w;
+                tmp3.xyz = tmp0.xxx * tmp3.xyz;
                 o.texcoord2.y = tmp3.x;
-                o.texcoord2.x = tmp2.x;
-                o.texcoord2.z = tmp1.x;
+                o.texcoord2.x = tmp2.z;
+                o.texcoord2.z = tmp1.y;
                 o.texcoord3.w = tmp0.y;
-                o.texcoord3.x = tmp2.y;
-                o.texcoord3.z = tmp1.y;
-                o.texcoord3.y = tmp3.y;
                 o.texcoord4.w = tmp0.z;
-                tmp0.xyz = _WorldSpaceCameraPos - tmp0.xyz;
-                o.texcoord4.x = tmp2.z;
-                o.texcoord5.x = dot(tmp0.xyz, tmp2.xyz);
-                o.texcoord4.z = tmp1.z;
-                o.texcoord5.z = dot(tmp0.xyz, tmp1.xyz);
-                o.texcoord5.y = dot(tmp0.xyz, tmp3.xyz);
+                o.texcoord3.x = tmp2.x;
+                o.texcoord4.x = tmp2.y;
+                o.texcoord3.z = tmp1.z;
+                o.texcoord4.z = tmp1.x;
+                o.texcoord3.y = tmp3.y;
                 o.texcoord4.y = tmp3.z;
                 o.texcoord6 = float4(0.0, 0.0, 0.0, 0.0);
                 return o;
@@ -665,74 +653,70 @@ Shader "Cloth/ClothShader" {
                 float4 tmp1;
                 float4 tmp2;
                 float4 tmp3;
-                tmp0 = tex2D(_MainTex, inp.texcoord.xy);
-                tmp0 = tmp0 * _Color;
-                tmp1 = tex2Dlod(_CutoutMask, float4(inp.texcoord.xy, 0, 0.0));
-                tmp1.x = 1.0 - tmp1.x;
-                tmp1.x = tmp1.x * _CutOff;
-                tmp0.w = tmp0.w < tmp1.x;
-                if (tmp0.w) {
+                tmp0.xy = inp.texcoord.xy * _CutoutMaskUVScale.xx;
+                tmp1 = tex2D(_MainTex, tmp0.xy);
+                tmp0.z = tmp1.w * _Color.w;
+                tmp1 = tex2Dlod(_CutoutMask, float4(tmp0.xy, 0, 0.0));
+                tmp0.x = 1.0 - tmp1.x;
+                tmp0.x = tmp0.x * _CutOff;
+                tmp0.x = tmp0.z < tmp0.x;
+                if (tmp0.x) {
                     discard;
                 }
-                tmp0.w = dot(inp.texcoord5.xyz, inp.texcoord5.xyz);
-                tmp0.w = rsqrt(tmp0.w);
-                tmp0.w = tmp0.w * inp.texcoord5.z;
-                tmp1.xyz = float3(_ScrollXSpeed.x, _ScrollYSpeed.x, _ScrollSpeedRandomFactor.x) * _Time.yxy;
-                tmp2.yz = frac(tmp1.xz);
-                tmp1.x = cos(tmp1.y);
-                tmp2.x = tmp1.x * 0.1 + tmp2.y;
-                tmp1.xy = tmp2.xz + inp.texcoord1.xy;
+                tmp0.xyz = float3(_ScrollXSpeed.x, _ScrollYSpeed.x, _ScrollSpeedRandomFactor.x) * _Time.yxy;
+                tmp1.yz = frac(tmp0.xz);
+                tmp0.x = cos(tmp0.y);
+                tmp1.x = tmp0.x * 0.1 + tmp1.y;
+                tmp0.xy = tmp1.xz + inp.texcoord1.xy;
+                tmp1 = tex2D(_MainTex, inp.texcoord.xy);
+                tmp1.xyz = tmp1.xyz * _Color.xyz;
                 tmp2 = tex2D(_GlossMap, inp.texcoord.xy);
-                tmp1.z = tmp2.x * _Metallic;
+                tmp0.z = tmp2.x * _Metallic;
                 tmp2 = tex2D(_NormalMap1, inp.texcoord.zw);
                 tmp2.x = tmp2.w * tmp2.x;
                 tmp2.xy = tmp2.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
-                tmp1.w = dot(tmp2.xy, tmp2.xy);
-                tmp1.w = min(tmp1.w, 1.0);
-                tmp1.w = 1.0 - tmp1.w;
-                tmp2.z = sqrt(tmp1.w);
-                tmp3 = tex2D(_NormalMap2, tmp1.xy);
+                tmp0.w = dot(tmp2.xy, tmp2.xy);
+                tmp0.w = min(tmp0.w, 1.0);
+                tmp0.w = 1.0 - tmp0.w;
+                tmp2.z = sqrt(tmp0.w);
+                tmp3 = tex2D(_NormalMap2, tmp0.xy);
                 tmp3.x = tmp3.w * tmp3.x;
                 tmp3.xy = tmp3.xy * float2(2.0, 2.0) + float2(-1.0, -1.0);
-                tmp1.x = dot(tmp3.xy, tmp3.xy);
-                tmp1.x = min(tmp1.x, 1.0);
-                tmp1.x = 1.0 - tmp1.x;
-                tmp3.z = sqrt(tmp1.x);
-                tmp1.x = _NormalBlendingRandomFactor * _Time.x;
-                tmp1.x = cos(tmp1.x);
-                tmp1.x = tmp1.x * 0.4;
+                tmp0.x = dot(tmp3.xy, tmp3.xy);
+                tmp0.x = min(tmp0.x, 1.0);
+                tmp0.x = 1.0 - tmp0.x;
+                tmp3.z = sqrt(tmp0.x);
+                tmp0.x = _NormalBlendingRandomFactor * _Time.x;
+                tmp0.x = cos(tmp0.x);
+                tmp0.x = tmp0.x * 0.4;
                 tmp3.xyz = tmp3.xyz * _NormalBlendThreshold.xxx;
-                tmp1.xyw = tmp3.xyz * tmp1.xxx + tmp2.xyz;
+                tmp0.xyw = tmp0.xxx * tmp3.xyz;
                 tmp3 = tex2D(_NormalsMask, inp.texcoord.xy);
-                tmp0.w = tmp0.w > 0.0;
-                tmp2.xyz = tmp0.www ? tmp2.xyz : -tmp2.xyz;
-                tmp1.xyw = tmp0.www ? tmp1.xyw : -tmp1.xyw;
-                tmp1.xyw = tmp1.xyw - tmp2.xyz;
-                tmp1.xyw = tmp3.xxx * tmp1.xyw + tmp2.xyz;
-                tmp0.w = dot(tmp1.xyz, tmp1.xyz);
-                tmp0.w = rsqrt(tmp0.w);
-                tmp1.xyw = tmp0.www * tmp1.xyw;
-                tmp0.w = _ThermalVisionOn > 0.0;
-                tmp2.xyz = tmp0.xyz * _Temperature.zzz;
+                tmp0.xyw = tmp3.xxx * tmp0.xyw + tmp2.xyz;
+                tmp1.w = dot(tmp0.xyz, tmp0.xyz);
+                tmp1.w = rsqrt(tmp1.w);
+                tmp0.xyw = tmp0.xyw * tmp1.www;
+                tmp1.w = _ThermalVisionOn > 0.0;
+                tmp2.xyz = tmp1.xyz * _Temperature.zzz;
                 tmp2.xyz = max(tmp2.xyz, _Temperature.xxx);
                 tmp2.xyz = min(tmp2.xyz, _Temperature.yyy);
                 tmp2.xyz = tmp2.xyz + _Temperature.www;
-                tmp0.xyz = tmp0.www ? tmp2.xyz : tmp0.xyz;
-                tmp2.x = dot(inp.texcoord2.xyz, tmp1.xyz);
-                tmp2.y = dot(inp.texcoord3.xyz, tmp1.xyz);
-                tmp2.z = dot(inp.texcoord4.xyz, tmp1.xyz);
-                tmp0.w = dot(tmp2.xyz, tmp2.xyz);
-                tmp0.w = rsqrt(tmp0.w);
-                tmp1.xyw = tmp0.www * tmp2.xyz;
-                tmp2.xyz = tmp0.xyz - float3(0.2209163, 0.2209163, 0.2209163);
-                o.sv_target1.xyz = tmp1.zzz * tmp2.xyz + float3(0.2209163, 0.2209163, 0.2209163);
-                tmp0.w = -tmp1.z * 0.7790837 + 0.7790837;
-                o.sv_target.xyz = tmp0.www * tmp0.xyz;
-                o.sv_target2.xyz = tmp1.xyw * float3(0.5, 0.5, 0.5) + float3(0.5, 0.5, 0.5);
+                tmp1.xyz = tmp1.www ? tmp2.xyz : tmp1.xyz;
+                tmp2.x = dot(inp.texcoord2.xyz, tmp0.xyz);
+                tmp2.y = dot(inp.texcoord3.xyz, tmp0.xyz);
+                tmp2.z = dot(inp.texcoord4.xyz, tmp0.xyz);
+                tmp0.x = dot(tmp2.xyz, tmp2.xyz);
+                tmp0.x = rsqrt(tmp0.x);
+                tmp0.xyw = tmp0.xxx * tmp2.xyz;
+                tmp2.xyz = tmp1.xyz - float3(0.2209163, 0.2209163, 0.2209163);
+                o.sv_target1.xyz = tmp0.zzz * tmp2.xyz + float3(0.2209163, 0.2209163, 0.2209163);
+                tmp0.z = -tmp0.z * 0.7790837 + 0.7790837;
+                o.sv_target.xyz = tmp0.zzz * tmp1.xyz;
+                o.sv_target2.xyz = tmp0.xyw * float3(0.5, 0.5, 0.5) + float3(0.5, 0.5, 0.5);
                 o.sv_target.w = 1.0;
                 o.sv_target1.w = _Glossiness;
                 o.sv_target2.w = 1.0;
-                //o.sv_target3 = float4(1.0, 1.0, 1.0, 1.0);
+                o.sv_target3 = float4(1.0, 1.0, 1.0, 1.0);
                 return o;
 			}
 			ENDCG

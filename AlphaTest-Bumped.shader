@@ -1,17 +1,4 @@
-//Shader "p0/Cutout/Bumped Diffuse" {
-//	Properties {
-//		[MaterialEnum(Static, 0, Characters, 1, Hands, 2)] _StencilType ("_StencilType", Float) = 0
-//		_Color ("Main Color", Vector) = (1,1,1,1)
-//		_MainTex ("Base (RGB) Trans (A)", 2D) = "white" {}
-//		_BumpMap ("Normalmap", 2D) = "bump" {}
-//		_Cutoff ("Alpha cutoff", Range(0, 1)) = 0.5
-//		_SpecVals ("Specular Vals", Vector) = (0.35,2,0,0)
-//		_DefVals ("Defuse Vals", Vector) = (0.1,2.5,0,0)
-//		_Temperature ("_Temperature(min, max, factor)", Vector) = (0.1,0.38,0.3,0)
-//		_Factor ("Z Offset Angle", Float) = 0
-//		_Units ("Z Offset Forward", Float) = 0
-//	}
-	Shader "p0/Cutout/Bumped Diffuse" {
+Shader "p0/Cutout/Bumped Diffuse" {
 	Properties {
 		_Color ("Main Color", Color) = (1,1,1,1)
 		_MainTex ("Base (RGB) Trans (A)", 2D) = "white" {}
@@ -666,6 +653,8 @@
             #pragma multi_compile ___ UNITY_HDR_ON
 			#pragma vertex vert
 			#pragma fragment frag
+
+            #pragma shader_feature _BUMPMAP
 			
 			#include "UnityCG.cginc"
 			struct v2f
